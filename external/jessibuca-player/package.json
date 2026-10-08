@@ -1,0 +1,29 @@
+{
+  "name": "@vben/jessibuca-player",
+  "version": "1.0.0",
+  "homepage": "https://github.com/nicheengine/temple-engine-webapp",
+  "bugs": "https://github.com/nicheengine/temple-engine-webapp/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicheengine/temple-engine-webapp.git",
+    "directory": "external/jessibuca-player"
+  },
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@vben-core/shared": "workspace:*",
+    "@vben-core/typings": "workspace:*",
+    "@vben/types": "workspace:*",
+    "@vben/utils": "workspace:*",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "jessibuca": "catalog:"
+  }
+}

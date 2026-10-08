@@ -103,6 +103,7 @@ const oxfmtConfig: OxfmtConfig = defineOxfmtConfig({
   //   stylesheet: './internal/tailwind-config/src/theme.css',
   //   preserveWhitespace: true,
   // },
+  ignorePatterns: ['libraries/**'],
   overrides: [
     {
       files: [

@@ -1,4 +1,5 @@
 export * from './constants';
+export * from './copy';
 export * from './date';
 export { formatFile } from './formatter';
 export * from './fs';

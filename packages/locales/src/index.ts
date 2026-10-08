@@ -8,8 +8,10 @@ import {
 
 const $t = i18n.global.t;
 const $te = i18n.global.te;
+const $locale = i18n.global.locale;
 
 export {
+  $locale,
   $t,
   $te,
   i18n,

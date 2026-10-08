@@ -1,0 +1,24 @@
+{
+  "name": "@vben/ossrs-player",
+  "version": "1.0.0",
+  "homepage": "https://github.com/nicheengine/temple-engine-webapp",
+  "bugs": "https://github.com/nicheengine/temple-engine-webapp/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicheengine/temple-engine-webapp.git",
+    "directory": "external/ossrs-player"
+  },
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@vben/types": "workspace:*",
+    "@vben/utils": "workspace:*",
+    "vue": "catalog:"
+  }
+}
