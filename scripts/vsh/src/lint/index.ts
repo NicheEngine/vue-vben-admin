@@ -95,7 +95,10 @@ async function runParallel(commands: Command[]) {
   const failed: Command[] = [];
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
-      failed.push(commands[index]);
+      const command = commands[index];
+      if (command) {
+        failed.push(command);
+      }
     }
   });
 
@@ -127,7 +130,7 @@ async function runLint({ format, threads }: LintCommandOptions) {
   const commands: Command[] = [
     ['oxlint', ['--type-aware', threadsArg]],
     ['oxfmt', ['--check', threadsArg]],
-    ['eslint', ['.', '--cache']],
+    ['eslint', ['.', '--cache', '--no-warn-ignored']],
     ['stylelint', ['**/*.{vue,css,less,scss}', '--cache']],
   ];
 
