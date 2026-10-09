@@ -550,6 +550,9 @@ importers:
       '@changesets/cli':
         specifier: 'catalog:'
         version: 3.0.3
+      '@easydarwin/easyplayer':
+        specifier: 'catalog:'
+        version: 5.1.4
       '@tsdown/css':
         specifier: 'catalog:'
         version: 0.22.14(jiti@2.7.0)(postcss@8.5.28)(sass-embedded@1.103.1)(sass@1.103.1)(tsdown@0.22.14)(yaml@2.9.1)
@@ -1376,6 +1379,9 @@ importers:
       '@types/html-minifier-terser':
         specifier: 'catalog:'
         version: 7.0.2
+      '@vben/depend-config':
+        specifier: workspace:*
+        version: link:../depend-config
       '@vitejs/plugin-vue':
         specifier: 'catalog:'
         version: 6.0.9(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.9.0(supports-color@10.2.2))(sass-embedded@1.103.1)(sass@1.103.1)(terser@5.50.0)(yaml@2.9.0))(vue@3.5.41(typescript@6.0.3))

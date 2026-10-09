@@ -44,6 +44,7 @@
     "@pnpm/workspace.read-manifest": "catalog:",
     "@types/archiver": "catalog:",
     "@types/html-minifier-terser": "catalog:",
+    "@vben/depend-config": "workspace:*",
     "@vitejs/plugin-vue": "catalog:",
     "@vitejs/plugin-vue-jsx": "catalog:",
     "dayjs": "catalog:",

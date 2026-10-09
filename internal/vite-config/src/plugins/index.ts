@@ -1,11 +1,20 @@
 import type { PluginOption } from 'vite';
 
+import type { DependTypes } from '@vben/depend-config';
+
 import type {
   ApplicationPluginOptions,
   CommonPluginOptions,
   ConditionPlugin,
   LibraryPluginOptions,
 } from '../typing';
+import type {
+  IHTMLTag,
+  InjectDependPluginOptions,
+  ScriptTag,
+} from './inject-depend';
+
+import viteDepends from '@vben/depend-config';
 
 import viteVueI18nPlugin from '@intlify/unplugin-vue-i18n/vite';
 import tailwindcss from '@tailwindcss/vite';
@@ -19,11 +28,13 @@ import viteVueDevTools from 'vite-plugin-vue-devtools';
 
 import { viteArchiverPlugin } from './archiver';
 import { viteDayjsPlugin } from './dayjs';
+import { viteBuildAppConfigPlugin, viteServeAppConfigPlugin } from './depend';
 import { viteExtraAppConfigPlugin } from './extra-app-config';
 import { viteFormFieldSlotMigrationWarningPlugin } from './form-field-slot-migration-warning';
 import { viteHtmlPlugin } from './html';
 import { viteImportMapPlugin } from './importmap';
 import { viteInjectAppLoadingPlugin } from './inject-app-loading';
+import { viteInjectDependPlugin } from './inject-depend';
 import { viteMetadataPlugin } from './inject-metadata';
 import { viteLicensePlugin } from './license';
 import { viteNitroMockPlugin } from './nitro-mock';
@@ -106,6 +117,8 @@ async function loadApplicationPlugins(
     compress,
     compressTypes,
     extraAppConfig,
+    depend,
+    dependOptions,
     html,
     dayjs,
     i18n,
@@ -122,6 +135,88 @@ async function loadApplicationPlugins(
     vxeTableLazyImport,
     ...commonOptions
   } = options;
+
+  function dependValues() {
+    const depends = {} as Record<DependTypes, () => void>;
+    if (depend && dependOptions?.depends?.cesium) {
+      depends.cesium = viteDepends.cesium;
+    }
+    if (depend && dependOptions?.depends?.tianditu) {
+      depends.tianditu = viteDepends.tianditu;
+    }
+    if (depend && dependOptions?.depends?.jessibuca) {
+      depends.jessibuca = viteDepends.jessibuca;
+    }
+    if (depend && dependOptions?.depends?.easyplayer) {
+      depends.easyplayer = viteDepends.easyplayer;
+    }
+    return depends;
+  }
+
+  function dependInject(): InjectDependPluginOptions {
+    let headScripts = [] as ScriptTag[];
+    const links = [] as IHTMLTag[];
+
+    if (depend && dependOptions?.depends?.cesium) {
+      headScripts.push({
+        type: 'text/javascript',
+        cesium: 'true',
+        src: '/cesium/Cesium.js',
+      });
+      links.push({
+        rel: 'stylesheet',
+        cesium: 'true',
+        href: '/cesium/Widgets/widgets.css',
+      });
+    }
+    if (depend && dependOptions?.depends?.tianditu) {
+      headScripts = [
+        ...headScripts,
+        {
+          type: 'text/javascript',
+          cesium: 'true',
+          src: '/tianditu/bytebuffer.min.js',
+        },
+        {
+          type: 'text/javascript',
+          cesium: 'true',
+          src: '/tianditu/cesiumTdt.js',
+        },
+      ];
+    }
+
+    if (depend && dependOptions?.depends?.jessibuca) {
+      headScripts = [
+        ...headScripts,
+        {
+          type: 'text/javascript',
+          cesium: 'true',
+          src: '/jessibuca/decoder.js',
+        },
+        {
+          type: 'text/javascript',
+          cesium: 'true',
+          src: '/jessibuca/jessibuca.js',
+        },
+      ];
+    }
+
+    if (depend && dependOptions?.depends?.easyplayer) {
+      headScripts.push({
+        type: 'text/javascript',
+        easyplayer: 'true',
+        src: `/easyplayer/EasyPlayer-element.min.js`,
+      });
+    }
+
+    return {
+      build: isBuild,
+      index: {
+        headScripts,
+        links,
+      },
+    } as InjectDependPluginOptions;
+  }
 
   const commonPlugins = await loadCommonPlugins(commonOptions);
 
@@ -218,6 +313,28 @@ async function loadApplicationPlugins(
       condition: isBuild && extraAppConfig,
       plugins: async () => [
         await viteExtraAppConfigPlugin({ isBuild: true, root: process.cwd() }),
+      ],
+    },
+    {
+      condition: depend,
+      plugins: async () => [await viteInjectDependPlugin(dependInject())],
+    },
+    {
+      condition: isBuild && depend && dependOptions?.build,
+      plugins: async () => [
+        await viteBuildAppConfigPlugin({
+          depends: dependValues(),
+          root: process.cwd(),
+        }),
+      ],
+    },
+    {
+      condition: !isBuild && depend && dependOptions?.serve,
+      plugins: async () => [
+        await viteServeAppConfigPlugin({
+          depends: dependValues(),
+          root: process.cwd(),
+        }),
       ],
     },
     {

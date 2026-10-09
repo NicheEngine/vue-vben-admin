@@ -53,6 +53,7 @@
     "dev:tdesign": "pnpm -F @vben/web-tdesign run dev",
     "dev:play": "pnpm -F @vben/playground run dev",
     "format": "vsh lint --format",
+    "fix": "vsh lint --format",
     "lint": "vsh lint",
     "postinstall": "pnpm -r run --if-present stub",
     "preinstall": "npx only-allow pnpm",
@@ -73,6 +74,7 @@
   "devDependencies": {
     "@changesets/changelog-github": "catalog:",
     "@changesets/cli": "catalog:",
+    "@easydarwin/easyplayer": "catalog:",
     "@tsdown/css": "catalog:",
     "@types/node": "catalog:",
     "@vben/commitlint-config": "workspace:*",

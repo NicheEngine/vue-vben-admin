@@ -9,6 +9,10 @@ import type {
 } from 'vite';
 import type { Options as PwaPluginOptions } from 'vite-plugin-pwa';
 
+import type { DependOptions } from '@vben/depend-config';
+
+import type { ServerProxies } from './config';
+
 /**
  * ImportMap 配置接口
  * @description 用于配置模块导入映射，支持自定义导入路径和范围
@@ -187,6 +191,45 @@ interface CommonPluginOptions {
 }
 
 /**
+ * 依赖拷贝插件配置选项
+ * @description 用于配置构建时的依赖拷贝
+ */
+interface DependPluginOptions {
+  /**
+   * 总开关
+   * @default false
+   */
+  build?: boolean;
+  /**
+   * 依赖拷贝运行脚本
+   * @default false
+   */
+  depends?: DependOptions;
+  /**
+   * serve时选项
+   * @default false
+   */
+  serve?: boolean;
+}
+
+/**
+ * 代理插件配置选项
+ * @description 用于配置构建时的代理配置
+ */
+interface ServerProxyOptions {
+  /**
+   * host开关
+   * @default false
+   */
+  host?: boolean;
+  /**
+   * open开关
+   * @default false
+   */
+  open?: boolean;
+}
+
+/**
  * 应用插件配置选项
  * @description 用于配置应用构建时的插件选项
  */
@@ -214,6 +257,17 @@ interface ApplicationPluginOptions extends CommonPluginOptions {
    * @description 可选的压缩类型
    */
   compressTypes?: ('brotli' | 'gzip')[];
+  /**
+   * 依赖拷贝配置文件
+   * @default false
+   * @description 在构建时依赖拷贝配置文件
+   */
+  depend?: boolean;
+  /**
+   * 压缩归档插件配置
+   * @description 配置压缩归档的行为
+   */
+  dependOptions?: DependPluginOptions;
   /**
    * 是否开启 dayjs 插件
    * @default true
@@ -286,6 +340,16 @@ interface ApplicationPluginOptions extends CommonPluginOptions {
    * PWA 插件配置
    */
   pwaOptions?: Partial<PwaPluginOptions>;
+
+  /**
+   * 多代理地址配置适配微服务
+   */
+  serverProxies?: ServerProxies;
+
+  /**
+   * 多代理地址配置适配微服务
+   */
+  serverProxyOptions?: ServerProxyOptions;
   /**
    * 是否开启 VXE Table 懒加载
    * @default false
