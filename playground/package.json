@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@tanstack/vue-query": "catalog:",
+    "@vben/jessibuca-player": "workspace:*",
     "@vben-core/design": "workspace:*",
     "@vben-core/menu-ui": "workspace:*",
     "@vben-core/typings": "workspace:*",
@@ -57,7 +58,9 @@
     "vue-router": "catalog:"
   },
   "devDependencies": {
+    "@easydarwin/easyplayer": "catalog:",
     "@playwright/test": "catalog:",
-    "@types/json-bigint": "catalog:"
+    "@types/json-bigint": "catalog:",
+    "cesium": "catalog:"
   }
 }

@@ -1,22 +1,34 @@
 import { runCesiumScript } from './cesium';
-import { runElementScript } from './easyplayer';
+import { runEasyplayerScript } from './easyplayer';
 import { runJessibucaScript } from './jessibuca';
 import { runTiandituScript } from './tianditu';
 
-export interface DependOptions {
-  jessibuca?: boolean;
-  cesium?: boolean;
-  easyplayer?: boolean;
-  tianditu?: boolean;
+export interface DependConfigOptions {
+  source?: string;
+  target?: string;
 }
 
-export type DependTypes = keyof DependOptions;
+export const DEPEND_KEYS = [
+  'cesium',
+  'tianditu',
+  'jessibuca',
+  'easyplayer',
+] as const;
 
-export const viteDepends = {
+export type DependTypes = (typeof DEPEND_KEYS)[number];
+
+export type DependOptions = {
+  [K in DependTypes]?: boolean | DependConfigOptions;
+};
+
+export const viteDepends: Record<
+  DependTypes,
+  (options?: boolean | DependConfigOptions) => void
+> = {
   jessibuca: runJessibucaScript,
   cesium: runCesiumScript,
   tianditu: runTiandituScript,
-  easyplayer: runElementScript,
+  easyplayer: runEasyplayerScript,
 };
 
 export default viteDepends;

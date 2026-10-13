@@ -5,6 +5,10 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { JessibucaPlayerApi } from './jessibuca-player-api';
 
+/**
+ * api 由外部（useJessibucaPlayer）创建并通过 props 注入，
+ * 组件内部不再自己 new，保证外部和组件共用同一实例。
+ */
 const props = withDefaults(defineProps<JessibucaPlayerProps>(), {
   config: () => ({}),
   controls: true,
@@ -26,9 +30,16 @@ const emit = defineEmits<{
 }>();
 
 const containerRef = ref<HTMLDivElement>();
-const api = new JessibucaPlayerApi({
-  config: props.config,
-  url: props.url,
+
+const api =
+  props.api ??
+  new JessibucaPlayerApi({
+    config: props.config,
+    url: props.url,
+  });
+
+// 把组件事件挂到 api 上（覆盖外部回调）
+api.attachCallbacks({
   onPlay: () => emit('play'),
   onPause: () => emit('pause'),
   onError: (err) => emit('error', err),
@@ -43,34 +54,15 @@ const api = new JessibucaPlayerApi({
   onRecording: (duration) => emit('recording', duration),
 });
 
-// 监听 URL 变化，自动重新播放
-watch(
-  () => props.url,
-  (url, old) => {
-    if (url && url !== old) {
-      api.setUrl(url);
-    }
-  },
-);
+let instance: JessibucaInstance | null = null;
+let mounted = false;
 
-// 监听配置变化
-watch(
-  () => props.config,
-  (config) => {
-    api.store.setState((prev) => ({
-      ...prev,
-      config: { ...prev.config, ...config },
-    }));
-  },
-  { deep: true },
-);
-
-onMounted(async () => {
+/** 创建底层 Jessibuca 实例 */
+async function createInstance() {
   await nextTick();
-  if (!containerRef.value) return;
+  if (!containerRef.value || instance) return;
 
-  // 改为从 window 上获取，而不是 import
-  const JessibucaConstructor = window.Jessibuca;
+  const JessibucaConstructor = (window as any).Jessibuca;
   if (!JessibucaConstructor) {
     console.error(
       '[JessibucaPlayer] 未找到 window.Jessibuca，请确保 jessibuca.js 已加载',
@@ -79,20 +71,65 @@ onMounted(async () => {
     return;
   }
 
-  const instance = new JessibucaConstructor({
-    container: containerRef.value,
-    ...api.store.state.config,
-  });
-  api.bindInstance(instance as unknown as JessibucaInstance);
+  const resolvedConfig = api.getResolvedConfig();
+  // oxlint-disable-next-line no-console
+  console.log(
+    '[JessibucaPlayer] create instance with config =',
+    resolvedConfig,
+  );
 
-  // 自动播放
+  instance = new JessibucaConstructor({
+    container: containerRef.value,
+    ...resolvedConfig,
+  }) as unknown as JessibucaInstance;
+
+  api.bindInstance(instance);
+}
+
+/** 销毁实例 */
+async function destroyInstance() {
+  if (!instance) return;
+  try {
+    await api.destroyPlayer();
+  } finally {
+    instance = null;
+  }
+}
+
+// URL 变化：同步 store，并主动重播
+watch(
+  () => props.url,
+  async (url, old) => {
+    if (!url || url === old) return;
+    api.setUrl(url);
+
+    if (!mounted) return;
+    if (!instance) await createInstance();
+    await api.play();
+  },
+);
+
+// config 变化：合并到 store
+watch(
+  () => props.config,
+  (config) => {
+    if (!config) return;
+    api.setConfig(config);
+  },
+  { deep: true },
+);
+
+onMounted(async () => {
+  mounted = true;
+  await createInstance();
   if (props.url && api.store.state.config.autoPlay !== false) {
     await api.play();
   }
 });
 
 onBeforeUnmount(async () => {
-  await api.destroy();
+  mounted = false;
+  await destroyInstance();
 });
 
 defineExpose({ api });

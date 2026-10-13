@@ -1,20 +1,10 @@
 import { copyFile } from '@vben/node-utils';
 
-const basePath = 'node_modules/@easydarwin/easyplayer/dist';
-const elementPath = `${basePath}/element`;
-const componentPath = `${basePath}/component`;
+const EASYPLAYER_PATH = `node_modules/@easydarwin/easyplayer/dist/element`;
+const TARGET_PATH = 'public/easyplayer';
 
-const elementTargets = {
+const targets = {
   files: ['crossdomain.xml', 'EasyPlayer.wasm', 'EasyPlayer-element.min.js'],
-} as const;
-
-const componentTargets = {
-  files: [
-    'crossdomain.xml',
-    'EasyPlayer.wasm',
-    'EasyPlayer-lib.min.js',
-    'EasyPlayer-component.min.js',
-  ],
 } as const;
 
 /**
@@ -22,10 +12,15 @@ const componentTargets = {
  * 两个函数不能都 clear 同一目录，否则后执行的会清空前一个的产物。
  * 解决方式：element 负责初始化目录（clear），component 追加（不 clear）。
  */
-export const runElementScript = () => {
-  copyFile(elementPath, 'public/easyplayer', elementTargets, true);
-};
-
-export const runComponentScript = () => {
-  copyFile(componentPath, 'public/easyplayer', componentTargets, false);
+export const runEasyplayerScript = (
+  options?: boolean | { source?: string; target?: string },
+) => {
+  if (options === false) {
+    return;
+  }
+  const source =
+    (typeof options === 'object' && options?.source) || EASYPLAYER_PATH;
+  const target =
+    (typeof options === 'object' && options?.target) || TARGET_PATH;
+  copyFile(source, target, targets, true);
 };

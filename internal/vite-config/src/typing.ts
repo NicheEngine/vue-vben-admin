@@ -9,7 +9,7 @@ import type {
 } from 'vite';
 import type { Options as PwaPluginOptions } from 'vite-plugin-pwa';
 
-import type { DependOptions } from '@vben/depend-config';
+import type { DependConfigOptions, DependOptions } from '@vben/depend-config';
 
 import type { ServerProxies } from './config';
 
@@ -418,11 +418,16 @@ export type {
   DefineApplicationOptions,
   DefineConfig,
   DefineLibraryOptions,
+  DependConfigOptions,
+  DependOptions,
+  DependPluginOptions,
   HtmlPluginOptions,
   IImportMap,
   ImportmapPluginOptions,
   LibraryPluginOptions,
   NitroMockPluginOptions,
   PrintPluginOptions,
+  ServerProxies,
+  ServerProxyOptions,
   VbenViteConfig,
 };

@@ -63,3 +63,9 @@ skills-lock.json
 .atomcode
 datalog
 .playwright-mcp
+*/libraries/*
+*/public/cesium/*
+*/public/easyplayer/*
+*/public/jessibuca/*
+*/public/tianditu/*
+

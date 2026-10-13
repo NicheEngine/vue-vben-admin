@@ -31,6 +31,7 @@ verifyDepsBeforeRun: false
 minimumReleaseAge: 0
 
 overrides:
+  '@types/node': 'catalog:'
   '@ast-grep/napi': 'catalog:'
   '@ctrl/tinycolor': 'catalog:'
   clsx: 'catalog:'
@@ -87,7 +88,7 @@ catalog:
   '@types/json-bigint': ^1.0.4
   '@types/jsonwebtoken': ^9.0.10
   '@types/lodash.clonedeep': ^4.5.9
-  '@types/node': ^25.9.7
+  '@types/node': ^26.2.0
   '@types/nprogress': ^0.2.3
   '@types/qrcode': ^1.5.6
   '@types/qs': ^6.15.1
@@ -107,6 +108,7 @@ catalog:
   axios: ^1.18.1
   axios-mock-adapter: ^2.1.0
   cac: ^7.0.0
+  cesium: 1.120.0
   chalk: ^5.6.2
   cheerio: ^1.2.0
   circular-dependency-scanner: ^3.0.1
@@ -223,4 +225,5 @@ allowBuilds:
   core-js: true
   esbuild: true
   lefthook: true
+  protobufjs: true
   vue-demi: true

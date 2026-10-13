@@ -86,5 +86,13 @@
   },
   "tiptap": {
     "title": "富文本编辑器"
+  },
+  "plugins": {
+    "title": "插件",
+    "cesium": "Cesium 插件",
+    "tianditu": "天地图插件",
+    "livePlayer": "LivePlayer 插件",
+    "easyPlayer": "EasyPlayer 插件",
+    "jessibuca": "Jessibuca 插件"
   }
 }

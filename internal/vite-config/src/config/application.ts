@@ -1,5 +1,7 @@
 import type { CSSOptions, UserConfig } from 'vite';
 
+import type { DependOptions } from '@vben/depend-config';
+
 import type { DefineApplicationOptions } from '../typing';
 
 import path, { relative } from 'node:path';
@@ -13,6 +15,7 @@ import { defaultImportmapOptions, getDefaultPwaOptions } from '../options';
 import { loadApplicationPlugins } from '../plugins';
 import { loadAndConvertEnv } from '../utils/env';
 import { getCommonConfig } from './common';
+import { createProxy } from './proxy';
 
 function defineApplicationConfig(userConfigPromise?: DefineApplicationOptions) {
   return defineConfig(async (config) => {
@@ -32,6 +35,17 @@ function defineApplicationConfig(userConfigPromise?: DefineApplicationOptions) {
       devtools: true,
       env,
       extraAppConfig: true,
+      depend: false,
+      dependOptions: {
+        build: false,
+        serve: false,
+        depends: {
+          jessibuca: false,
+          cesium: false,
+          easyplayer: false,
+          tianditu: false,
+        } as DependOptions,
+      },
       html: true,
       i18n: true,
       importmapOptions: defaultImportmapOptions,
@@ -53,7 +67,13 @@ function defineApplicationConfig(userConfigPromise?: DefineApplicationOptions) {
       ...application,
     });
 
-    const { injectGlobalScss = true } = application;
+    const {
+      injectGlobalScss = true,
+      serverProxies = {},
+      serverProxyOptions = {},
+    } = application;
+
+    const { host = true, open = true } = serverProxyOptions;
 
     const applicationConfig: UserConfig = {
       base,
@@ -77,8 +97,10 @@ function defineApplicationConfig(userConfigPromise?: DefineApplicationOptions) {
       css: createCssOptions(injectGlobalScss),
       plugins,
       server: {
-        host: true,
-        port,
+        host,
+        open,
+        port: port ?? 8080,
+        proxy: await createProxy(serverProxies),
         warmup: {
           // 预热文件
           clientFiles: [

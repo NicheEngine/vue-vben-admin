@@ -14,7 +14,7 @@ import type {
   ScriptTag,
 } from './inject-depend';
 
-import viteDepends from '@vben/depend-config';
+import viteDepends, { DEPEND_KEYS } from '@vben/depend-config';
 
 import viteVueI18nPlugin from '@intlify/unplugin-vue-i18n/vite';
 import tailwindcss from '@tailwindcss/vite';
@@ -138,17 +138,15 @@ async function loadApplicationPlugins(
 
   function dependValues() {
     const depends = {} as Record<DependTypes, () => void>;
-    if (depend && dependOptions?.depends?.cesium) {
-      depends.cesium = viteDepends.cesium;
-    }
-    if (depend && dependOptions?.depends?.tianditu) {
-      depends.tianditu = viteDepends.tianditu;
-    }
-    if (depend && dependOptions?.depends?.jessibuca) {
-      depends.jessibuca = viteDepends.jessibuca;
-    }
-    if (depend && dependOptions?.depends?.easyplayer) {
-      depends.easyplayer = viteDepends.easyplayer;
+    const config = dependOptions?.depends ?? {};
+
+    for (const key of DEPEND_KEYS) {
+      const value = config[key];
+      if (!depend || !value) {
+        continue;
+      }
+      const script = viteDepends[key];
+      depends[key] = () => script(value);
     }
     return depends;
   }
@@ -190,12 +188,7 @@ async function loadApplicationPlugins(
         ...headScripts,
         {
           type: 'text/javascript',
-          cesium: 'true',
-          src: '/jessibuca/decoder.js',
-        },
-        {
-          type: 'text/javascript',
-          cesium: 'true',
+          jessibuca: 'true',
           src: '/jessibuca/jessibuca.js',
         },
       ];
@@ -316,7 +309,10 @@ async function loadApplicationPlugins(
       ],
     },
     {
-      condition: depend,
+      condition:
+        depend &&
+        ((isBuild && dependOptions?.build) ||
+          (!isBuild && dependOptions?.serve)),
       plugins: async () => [await viteInjectDependPlugin(dependInject())],
     },
     {
