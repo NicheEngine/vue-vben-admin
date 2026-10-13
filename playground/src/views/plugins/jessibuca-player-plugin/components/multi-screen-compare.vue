@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { onBeforeUnmount, watch } from 'vue';
+
 import { useJessibucaPlayer } from '@vben/jessibuca-player';
 
 import { Card } from 'antdv-next';
@@ -15,10 +17,8 @@ const modes = [
   { mode: 2 as const, label: '等比裁切' },
 ];
 
-// 3 个独立播放器实例
 const players = modes.map(({ mode }) => {
   const [Player, api] = useJessibucaPlayer({
-    url: props.url,
     config: {
       autoPlay: true,
       isMute: true,
@@ -32,6 +32,22 @@ const players = modes.map(({ mode }) => {
     },
   });
   return { Player, api, mode };
+});
+
+// props.url 变化时同步到每个 api（组件的 watch 会各自 play）
+watch(
+  () => props.url,
+  (url) => {
+    if (!url) return;
+    players.forEach((p) => p.api.setUrl(url));
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  players.forEach((p) => {
+    void p.api.destroy();
+  });
 });
 </script>
 

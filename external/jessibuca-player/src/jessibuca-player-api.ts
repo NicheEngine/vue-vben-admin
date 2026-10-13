@@ -11,12 +11,6 @@ import type {
 import { createStore } from '@vben-core/shared/store';
 import { bindMethods } from '@vben-core/shared/utils';
 
-/**
- * 把 decoder 规整为绝对 URL。
- * Jessibuca 内部对相对路径的解析基于"当前页面 URL"，
- * SPA 下会拼成 `/plugins/decoder.js` 这种错误路径，
- * 统一转成绝对 URL 可彻底避免。
- */
 function normalizeDecoder(decoder?: string): string | undefined {
   if (!decoder) return decoder;
   if (/^https?:\/\//i.test(decoder) || decoder.startsWith('//')) {
@@ -26,6 +20,23 @@ function normalizeDecoder(decoder?: string): string | undefined {
   const path = decoder.startsWith('/') ? decoder : `/${decoder}`;
   return `${window.location.origin}${path}`;
 }
+
+/**
+ * 结构性配置：一旦实例创建就不能改，
+ * 变了必须销毁重建，否则不生效。
+ */
+const STRUCTURAL_CONFIG_KEYS = new Set<keyof JessibucaConfig>([
+  'autoWasm',
+  'decoder',
+  'enableRecording',
+  'forceNoOffscreen',
+  'openWebglAlignment',
+  'recordType',
+  'useMSE',
+  'useOffscreen',
+  'useWCS',
+  'wcsUseVideoRender',
+]);
 
 function createDefaultState(): JessibucaStoreState {
   return {
@@ -59,7 +70,6 @@ function createDefaultState(): JessibucaStoreState {
       autoUseSystemFullScreen: true,
       enableRecording: false,
       recordType: 'webm',
-      // 关闭 Jessibuca 内部自动重播，避免和外部 setUrl 打架
       loadingTimeoutReplay: false,
       heartTimeoutReplay: false,
       loadingTimeoutReplayTimes: 0,
@@ -74,6 +84,12 @@ export class JessibucaPlayerApi {
   private boundHandlers = new Map<string, (...args: any[]) => void>();
   private callbacks: JessibucaCallbacks;
   private instance: JessibucaInstance | null = null;
+
+  /**
+   * 结构性配置变化时置 true。
+   * 组件 watch 到后销毁重建实例，重建完由组件调用 clearRebuildFlag()。
+   */
+  private rebuildFlag = false;
 
   constructor(options: JessibucaApiOptions = {}) {
     const {
@@ -124,16 +140,6 @@ export class JessibucaPlayerApi {
 
   // ========== 回调注入 ==========
 
-  /**
-   * 附加/覆盖回调。
-   * 组件通过它把 emit 事件挂到 api 上。
-   */
-  public attachCallbacks(callbacks: JessibucaCallbacks) {
-    this.callbacks = { ...this.callbacks, ...callbacks };
-  }
-
-  // ========== 配置 ==========
-
   public bindInstance(instance: JessibucaInstance | null) {
     if (this.instance) this.unbindEvents();
     this.instance = instance;
@@ -145,15 +151,30 @@ export class JessibucaPlayerApi {
     this.store.setState((prev) => ({ ...prev, isMuted: false }));
   }
 
-  clearView() {
-    this.instance?.clearView();
+  // ========== 配置 ==========
+
+  public clearRebuildFlag() {
+    this.rebuildFlag = false;
   }
 
-  // ========== 实例生命周期 ==========
+  clearView() {
+    const inst = this.instance as any;
+    if (!inst) return;
+    try {
+      // 先暂停，防止新帧覆盖清屏
+      inst.pause?.();
+      inst.clearView?.();
+    } catch (error) {
+      console.warn('[JessibucaPlayerApi] clearView error:', error);
+    }
+    this.updatePlaying(false);
+  }
 
   public async destroy() {
     await this.destroyPlayer();
   }
+
+  // ========== 实例生命周期 ==========
 
   public async destroyPlayer() {
     this.unbindEvents();
@@ -165,11 +186,14 @@ export class JessibucaPlayerApi {
     this.instance = null;
   }
 
+  public getCallbacks(): Readonly<JessibucaCallbacks> {
+    return this.callbacks;
+  }
+
   public getInstance(): JessibucaInstance | null {
     return this.instance;
   }
 
-  /** 供组件构造 Jessibuca 时使用（decoder 保证绝对 URL） */
   public getResolvedConfig(): JessibucaConfig {
     const cfg = { ...this.store.state.config };
     if (cfg.decoder) {
@@ -178,12 +202,18 @@ export class JessibucaPlayerApi {
     return cfg;
   }
 
-  // ========== 播放控制 ==========
+  // ========== 重建标记 ==========
 
   mute() {
     this.instance?.mute();
     this.store.setState((prev) => ({ ...prev, isMuted: true }));
   }
+
+  public needsRebuild(): boolean {
+    return this.rebuildFlag;
+  }
+
+  // ========== 播放控制 ==========
 
   async pause() {
     await this.instance?.pause();
@@ -202,7 +232,6 @@ export class JessibucaPlayerApi {
     }
 
     this.syncUrlToInstance(url);
-
     this.updateLoading(true);
     this.store.setState((prev) => ({ ...prev, error: null }));
 
@@ -217,19 +246,6 @@ export class JessibucaPlayerApi {
     this.instance?.resize();
   }
 
-  /**
-   * 截图。
-   * 官方推荐签名：screenshot(filename, format, quality, type)
-   * - filename: 文件名（不含扩展名），默认时间戳
-   * - format: 'png' | 'jpeg' | 'webp'，默认 png
-   * - quality: 0.0-1.0，仅 jpeg/webp 有效，默认 0.92
-   * - type: 'download' | 'base64' | 'blob'，默认 download
-   *
-   * 返回类型取决于 type 参数：
-   * - 'download' 或未传: 触发下载，返回 undefined
-   * - 'base64': 返回 base64 字符串
-   * - 'blob': 返回 Blob 对象
-   */
   screenshot(
     filename?: string,
     format?: 'jpeg' | 'png' | 'webp',
@@ -240,14 +256,11 @@ export class JessibucaPlayerApi {
       console.warn('[JessibucaPlayerApi] instance 为空，screenshot 未执行');
       return undefined;
     }
-
     const inst = this.instance as any;
     if (typeof inst.screenshot !== 'function') {
       console.warn('[JessibucaPlayerApi] 当前 Jessibuca 实例不支持 screenshot');
       return undefined;
     }
-
-    // 官方推荐直传四个参数，让 Jessibuca 内部自行处理默认值
     return inst.screenshot(filename, format, quality, type);
   }
 
@@ -255,13 +268,66 @@ export class JessibucaPlayerApi {
     this.instance?.setBufferTime(time);
   }
 
-  /** 用最新的 config 合并到 store */
+  /**
+   * 合并回调（同名覆盖）。
+   * 组件用它把 emit 挂到 api 上；外部通过 useJessibucaPlayer 传的回调
+   * 不会被覆盖，组件会先取 getCallbacks() 再 emit，实现「外部兜底 + 组件事件」。
+   */
+  public setCallbacks(callbacks: JessibucaCallbacks) {
+    this.callbacks = { ...this.callbacks, ...callbacks };
+  }
+
+  /**
+   * 合并 config 到 store。
+   * - 热更新项：立即调用对应 setter
+   * - 结构性项：置 rebuildFlag，组件 watch 到后销毁重建
+   *
+   * 注意：传入的 config 先 normalize（decoder 转绝对 URL），
+   * 再和 prevCfg 比较，避免 decoder 的假阳性导致误重建。
+   */
   public setConfig(config: Partial<JessibucaConfig>) {
-    const merged = { ...this.store.state.config, ...config };
-    if (merged.decoder) {
-      merged.decoder = normalizeDecoder(merged.decoder);
+    const prevCfg = this.store.state.config;
+
+    // 先 normalize 传入的 config
+    const incoming: Partial<JessibucaConfig> = { ...config };
+    if (incoming.decoder) {
+      incoming.decoder = normalizeDecoder(incoming.decoder);
     }
+
+    const merged = { ...prevCfg, ...incoming };
     this.store.setState((prev) => ({ ...prev, config: merged }));
+
+    // 热更新
+    if (
+      incoming.scaleMode !== undefined &&
+      incoming.scaleMode !== prevCfg.scaleMode
+    ) {
+      this.setScaleMode(incoming.scaleMode);
+    }
+    if (incoming.rotate !== undefined && incoming.rotate !== prevCfg.rotate) {
+      this.setRotate(incoming.rotate);
+    }
+    if (incoming.volume !== undefined && incoming.volume !== prevCfg.volume) {
+      this.setVolume(incoming.volume);
+    }
+    if (incoming.isMute !== undefined && incoming.isMute !== prevCfg.isMute) {
+      if (incoming.isMute) this.mute();
+      else this.cancelMute();
+    }
+    if (
+      incoming.videoBuffer !== undefined &&
+      incoming.videoBuffer !== prevCfg.videoBuffer
+    ) {
+      this.setBufferTime(incoming.videoBuffer);
+    }
+
+    // 结构性：用 normalize 后的 incoming 和 prevCfg 比
+    for (const key of Object.keys(incoming) as (keyof JessibucaConfig)[]) {
+      if (STRUCTURAL_CONFIG_KEYS.has(key) && incoming[key] !== prevCfg[key]) {
+        this.rebuildFlag = true;
+        break;
+      }
+    }
   }
 
   setError(error: null | string) {
@@ -269,10 +335,12 @@ export class JessibucaPlayerApi {
     if (error) this.callbacks.onError?.(new Error(error));
   }
 
-  // ========== 画面控制 ==========
-
   setRotate(deg: number) {
     this.instance?.setRotate(deg);
+    this.store.setState((prev) => ({
+      ...prev,
+      config: { ...prev.config, rotate: deg },
+    }));
   }
 
   setScaleMode(mode: 0 | 1 | 2) {
@@ -290,26 +358,29 @@ export class JessibucaPlayerApi {
     }));
   }
 
+  /**
+   * 设置 url。
+   * 只更新 store 和实例 _opt.url，不自动重播。
+   * 重播由组件 watch 或用户显式调用 play() 触发，避免双份触发源。
+   */
   setUrl(url: string) {
     this.store.setState((prev) => ({ ...prev, url, error: null }));
     this.syncUrlToInstance(url);
-
-    if (this.instance && this.store.state.isPlaying) {
-      void this.play();
-    }
   }
 
   setVolume(volume: number) {
     const vol = Math.min(1, Math.max(0, volume));
     this.instance?.setVolume(vol);
-    this.store.setState((prev) => ({ ...prev, volume: vol }));
+    this.store.setState((prev) => ({
+      ...prev,
+      volume: vol,
+      config: { ...prev.config, volume: vol },
+    }));
   }
 
   startRecord(fileName?: string, fileType?: string) {
     this.instance?.startRecord(fileName, fileType);
   }
-
-  // ========== 截图与录制 ==========
 
   stopRecordAndSave() {
     this.instance?.stopRecordAndSave();
@@ -363,7 +434,6 @@ export class JessibucaPlayerApi {
       error: (error: Error | string) => {
         const message = error instanceof Error ? error.message : String(error);
         this.setError(message);
-        this.callbacks.onError?.(error);
       },
       timeout: (error: string) => {
         this.setError(`播放超时: ${error}`);
@@ -392,8 +462,6 @@ export class JessibucaPlayerApi {
     }
   }
 
-  // ========== 内部工具 ==========
-
   private patchDecoderInStore() {
     const decoder = this.store.state.config.decoder;
     const normalized = normalizeDecoder(decoder);
@@ -405,7 +473,6 @@ export class JessibucaPlayerApi {
     }
   }
 
-  /** 把 url 同步到 Jessibuca 实例的 _opt.url */
   private syncUrlToInstance(url: string) {
     const inst = this.instance as any;
     if (inst && inst._opt) {

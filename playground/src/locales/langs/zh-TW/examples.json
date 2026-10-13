@@ -86,13 +86,5 @@
   },
   "tiptap": {
     "title": "富文本編輯器"
-  },
-  "plugins": {
-    "title": "外掛",
-    "cesium": "Cesium 外掛",
-    "tianditu": "天地圖外掛",
-    "livePlayer": "LivePlayer 外掛",
-    "easyPlayer": "EasyPlayer 外掛",
-    "jessibuca": "Jessibuca 外掛"
   }
 }

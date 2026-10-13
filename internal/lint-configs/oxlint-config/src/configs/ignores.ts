@@ -7,6 +7,7 @@ const ignores: OxlintConfig = {
     'docs/**',
     'libraries/**',
     'playground/public/**',
+    '**/public/**',
     '**/*.json',
     '**/*.md',
     '**/*.svg',

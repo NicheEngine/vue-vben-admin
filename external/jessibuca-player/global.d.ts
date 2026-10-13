@@ -122,13 +122,19 @@ interface JessibucaInstance {
   setTimeout(time: number): void;
 
   // ========== 截图与录制 ==========
-  /** 截图 */
+  /**
+   * 截图。
+   * 返回类型取决于 type 参数：
+   * - download 或未传：undefined
+   * - base64：string
+   * - blob：Blob
+   */
   screenshot(
     filename?: string,
     format?: string,
     quality?: number,
     type?: string,
-  ): string;
+  ): Blob | string | undefined;
   /** 开始录制 */
   startRecord(fileName?: string, fileType?: string): void;
   /** 停止录制并保存 */

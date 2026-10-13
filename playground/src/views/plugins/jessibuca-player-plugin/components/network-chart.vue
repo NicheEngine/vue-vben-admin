@@ -1,36 +1,50 @@
 <script lang="ts" setup>
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-const props = defineProps<{
-  /** 数值，比如 buf(ms) 或 kBps */
-  value: number;
-  /** 最大值（用于归一化） */
-  max?: number;
-  /** 颜色 */
-  color?: string;
-  /** 标题 */
-  label?: string;
-  /** 单位 */
-  unit?: string;
-  /** 保留多少帧 */
-  capacity?: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** 数值，比如 buf(ms) 或 kBps */
+    value: number;
+    /** 最大值（用于归一化） */
+    max?: number;
+    /** 颜色 */
+    color?: string;
+    /** 标题 */
+    label?: string;
+    /** 单位 */
+    unit?: string;
+    /** 保留多少帧 */
+    capacity?: number;
+  }>(),
+  {
+    max: 100,
+    color: '#22c55e',
+    label: '',
+    unit: '',
+    capacity: 120,
+  },
+);
 
 const canvasRef = ref<HTMLCanvasElement>();
 const data = ref<number[]>([]);
+const maxValue = ref(props.max);
 
-const capacity = props.capacity ?? 120;
-const maxValue = ref(props.max ?? 100);
-const color = props.color ?? '#22c55e';
-const label = props.label ?? '';
-const unit = props.unit ?? '';
+let observer: null | ResizeObserver = null;
+
+watch(
+  () => props.max,
+  (v) => {
+    maxValue.value = v;
+    draw();
+  },
+);
 
 watch(
   () => props.value,
   (v) => {
     if (typeof v !== 'number' || Number.isNaN(v)) return;
     data.value.push(v);
-    if (data.value.length > capacity) data.value.shift();
+    if (data.value.length > props.capacity) data.value.shift();
     if (v > maxValue.value) maxValue.value = v * 1.2;
     draw();
   },
@@ -45,11 +59,15 @@ function draw() {
   const dpr = window.devicePixelRatio || 1;
   const cssWidth = canvas.clientWidth;
   const cssHeight = canvas.clientHeight;
+  if (cssWidth === 0 || cssHeight === 0) return;
+
+  // 只在尺寸真正变化时重设并重置变换
   if (canvas.width !== cssWidth * dpr || canvas.height !== cssHeight * dpr) {
     canvas.width = cssWidth * dpr;
     canvas.height = cssHeight * dpr;
-    ctx.scale(dpr, dpr);
   }
+  // 用 setTransform 替代 scale，避免累积缩放
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const w = cssWidth;
   const h = cssHeight;
@@ -69,10 +87,10 @@ function draw() {
   if (data.value.length < 2) return;
 
   const max = maxValue.value || 1;
-  const step = w / (capacity - 1);
+  const step = w / (props.capacity - 1);
 
   // 折线
-  ctx.strokeStyle = color;
+  ctx.strokeStyle = props.color;
   ctx.lineWidth = 1.6;
   ctx.beginPath();
   data.value.forEach((v, i) => {
@@ -84,7 +102,7 @@ function draw() {
   ctx.stroke();
 
   // 面积填充
-  ctx.fillStyle = `${color}33`;
+  ctx.fillStyle = `${props.color}33`;
   ctx.beginPath();
   ctx.moveTo(0, h);
   data.value.forEach((v, i) => {
@@ -99,10 +117,13 @@ function draw() {
 
 onMounted(() => {
   draw();
-  // 容器大小变化时重绘
-  const observer = new ResizeObserver(() => draw());
+  observer = new ResizeObserver(() => draw());
   if (canvasRef.value) observer.observe(canvasRef.value);
-  onBeforeUnmount(() => observer.disconnect());
+});
+
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  observer = null;
 });
 </script>
 

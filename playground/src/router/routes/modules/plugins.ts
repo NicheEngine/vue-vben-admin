@@ -8,7 +8,7 @@ const routes: RouteRecordRaw[] = [
       icon: 'mingcute:plugin-2-line',
       keepAlive: true,
       order: 1100,
-      title: $t('examples.plugins.title'),
+      title: $t('plugins.title'),
     },
     name: 'Plugins',
     path: '/plugins',
@@ -19,7 +19,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/plugins/cesium-plugin/index.vue'),
         meta: {
           icon: 'simple-icons:cesium',
-          title: $t('examples.plugins.cesium'),
+          title: $t('plugins.cesium'),
         },
       },
       {
@@ -28,7 +28,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/plugins/tianditu-plugin/index.vue'),
         meta: {
           icon: 'mdi:map',
-          title: $t('examples.plugins.tianditu'),
+          title: $t('plugins.tianditu'),
         },
       },
       {
@@ -37,7 +37,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/plugins/live-player-plugin/index.vue'),
         meta: {
           icon: 'mdi:video-outline',
-          title: $t('examples.plugins.livePlayer'),
+          title: $t('plugins.livePlayer'),
         },
       },
       {
@@ -46,17 +46,27 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/plugins/easy-player-plugin/index.vue'),
         meta: {
           icon: 'mdi:play-circle-outline',
-          title: $t('examples.plugins.easyPlayer'),
+          title: $t('plugins.easyPlayer'),
         },
       },
       {
         name: 'JessibucaPluginExample',
-        path: 'jessibuca',
+        path: 'jessibuca-player',
         component: () =>
           import('#/views/plugins/jessibuca-player-plugin/index.vue'),
         meta: {
           icon: 'mdi:movie-play-outline',
-          title: $t('examples.plugins.jessibuca'),
+          title: $t('plugins.jessibucaPlayer'),
+        },
+      },
+      {
+        name: 'OssrsPlayerPluginExample',
+        path: 'ossrs-player',
+        component: () =>
+          import('#/views/plugins/ossrs-player-plugin/index.vue'),
+        meta: {
+          icon: 'mdi:play-network-outline',
+          title: $t('plugins.ossrsPlayer'),
         },
       },
     ],

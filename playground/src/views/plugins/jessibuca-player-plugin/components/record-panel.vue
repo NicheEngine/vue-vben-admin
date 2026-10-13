@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 import { Button, Card, Tag } from 'antdv-next';
 
@@ -21,26 +21,46 @@ const elapsed = computed(() => {
   return `${hh}:${mm}:${ss}`;
 });
 
+function stopTimer() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+  recordStartTime.value = null;
+}
+
+function startTimer() {
+  stopTimer();
+  recordStartTime.value = Date.now();
+  duration.value = 0;
+  timer = setInterval(() => {
+    if (recordStartTime.value) {
+      duration.value = Date.now() - recordStartTime.value;
+    }
+  }, 200);
+}
+
+/** 外部 isRecording 变化时同步本地计时器 */
+watch(
+  () => props.isRecording,
+  (recording) => {
+    if (recording) startTimer();
+    else stopTimer();
+  },
+  { immediate: true },
+);
+
 function toggle() {
   if (props.isRecording) {
     props.stopRecordAndSave();
-    if (timer) {
-      clearInterval(timer);
-      timer = null;
-    }
-    recordStartTime.value = null;
   } else {
     props.startRecord(`jessibuca-${Date.now()}`, 'webm');
-    recordStartTime.value = Date.now();
-    duration.value = 0;
-    if (timer) clearInterval(timer);
-    timer = setInterval(() => {
-      if (recordStartTime.value) {
-        duration.value = Date.now() - recordStartTime.value;
-      }
-    }, 200);
   }
 }
+
+onBeforeUnmount(() => {
+  stopTimer();
+});
 </script>
 
 <template>

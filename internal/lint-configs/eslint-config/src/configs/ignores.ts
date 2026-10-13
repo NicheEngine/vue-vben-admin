@@ -56,6 +56,7 @@ export async function ignores(): Promise<Linter.Config[]> {
         '**/.claude/**',
         '**/.cursor/**',
         'libraries/**',
+        '../public/**',
         '**/__tests__/**',
       ],
     },

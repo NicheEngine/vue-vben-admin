@@ -1,0 +1,9 @@
+{
+  "title": "Plugins",
+  "cesium": "Cesium Plugin",
+  "tianditu": "Tianditu Plugin",
+  "livePlayer": "LivePlayer Plugin",
+  "easyPlayer": "EasyPlayer Plugin",
+  "jessibucaPlayer": "JessibucaPlayer Plugin",
+  "ossrsPlayer": "OssrsPlayer Plugin"
+}

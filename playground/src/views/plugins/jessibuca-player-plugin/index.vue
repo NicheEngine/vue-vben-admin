@@ -128,6 +128,9 @@ const inputUrl = ref(DEFAULT_URL);
 const currentUrl = ref(DEFAULT_URL);
 const urlHistory = ref<string[]>([]);
 
+/** 实时码率 kBps（提前声明，供 onStats 闭包使用） */
+const currentKbps = ref(0);
+
 const config = reactive<JessibucaConfig>({
   autoPlay: true,
   isMute: true,
@@ -147,9 +150,13 @@ const config = reactive<JessibucaConfig>({
   heartTimeoutReplayTimes: 0,
 });
 
+// 只传回调，url/config 交给组件 props 单向管理
 const [Player, api] = useJessibucaPlayer({
   url: currentUrl.value,
   config: { ...config },
+  onStats: (stats) => {
+    currentKbps.value = (stats.vbps || 0) / 8 / 1024;
+  },
 });
 
 // ============================================================
@@ -166,9 +173,6 @@ const networkDelay = api.useSelector((s) => s.networkDelay);
 const isMuted = api.useSelector((s) => s.isMuted);
 const isRecording = api.useSelector((s) => s.isRecording);
 const volume = api.useSelector((s) => s.volume);
-
-/** 实时码率 kBps */
-const currentKbps = ref(0);
 
 const videoRatio = computed(() => {
   if (!videoWidth.value || !videoHeight.value) return '-';
@@ -265,9 +269,8 @@ function applyUrl(u?: string) {
   const value = (u ?? inputUrl.value).trim();
   if (!value) return;
 
+  // 只改 props.url，组件 watch 会同步到 api 并（autoPlay 时）播放
   currentUrl.value = value;
-  api.setUrl(value);
-  api.play();
 
   const history = urlHistory.value.filter((h) => h !== value);
   history.unshift(value);
@@ -284,19 +287,22 @@ function handleToggle() {
 }
 
 function handleReload() {
-  api.setUrl(currentUrl.value);
-  api.play();
+  // currentUrl 未变，watch 不触发，显式重播
+  void api.play();
 }
 
 function handleMuteChange(checked: boolean) {
+  config.isMute = checked; // 同步 reactive config，避免下次 watch 回退
   checked ? api.mute() : api.cancelMute();
 }
 
 function handleVolumeChange(value: number) {
+  config.volume = value;
   api.setVolume(value);
 }
 
 function handleScaleModeChange(mode: 0 | 1 | 2) {
+  config.scaleMode = mode;
   api.setScaleMode(mode);
 }
 
@@ -306,9 +312,8 @@ function handleScaleModeChange(mode: 0 | 1 | 2) {
  * 传 undefined 会触发 `r.split is not a function`。
  */
 function handleScreenshot(): string {
-  const base64 = api.screenshot(`jessibuca-${Date.now()}`, 'png', 1, 'base64');
-  // base64 类型返回字符串，其他类型返回 Blob 或 undefined
-  return typeof base64 === 'string' ? base64 : '';
+  const result = api.screenshot(`jessibuca-${Date.now()}`, 'png', 1, 'base64');
+  return typeof result === 'string' ? result : '';
 }
 
 function handleFullscreen() {
@@ -328,13 +333,7 @@ watch([sizeMode, fixedWidth, fixedHeight, ratio, ratioBaseWidth], () => {
 onMounted(async () => {
   await runFullCheck();
   if (!jessibucaReady.value) startPolling();
-
-  // 挂 stats 回调（attachCallbacks 会合并，不覆盖）
-  api.attachCallbacks({
-    onStats: (stats) => {
-      currentKbps.value = (stats.vbps || 0) / 8 / 1024;
-    },
-  });
+  // onStats 已通过 useJessibucaPlayer options 注册，无需再 setCallbacks
 });
 
 onBeforeUnmount(() => {
@@ -342,7 +341,7 @@ onBeforeUnmount(() => {
     clearInterval(checkTimer);
     checkTimer = null;
   }
-  api.destroy();
+  void api.destroy();
 });
 </script>
 

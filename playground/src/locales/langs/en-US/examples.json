@@ -86,13 +86,5 @@
   },
   "tiptap": {
     "title": "Rich Text Editor"
-  },
-  "plugins": {
-    "title": "Plugins",
-    "cesium": "Cesium Plugin",
-    "tianditu": "Tianditu Plugin",
-    "livePlayer": "LivePlayer Plugin",
-    "easyPlayer": "EasyPlayer Plugin",
-    "jessibuca": "Jessibuca Plugin"
   }
 }
