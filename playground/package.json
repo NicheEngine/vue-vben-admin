@@ -31,7 +31,6 @@
   },
   "dependencies": {
     "@tanstack/vue-query": "catalog:",
-    "@vben/jessibuca-player": "workspace:*",
     "@vben-core/design": "workspace:*",
     "@vben-core/menu-ui": "workspace:*",
     "@vben-core/typings": "workspace:*",
@@ -40,6 +39,7 @@
     "@vben/constants": "workspace:*",
     "@vben/hooks": "workspace:*",
     "@vben/icons": "workspace:*",
+    "@vben/jessibuca-player": "workspace:*",
     "@vben/layouts": "workspace:*",
     "@vben/locales": "workspace:*",
     "@vben/plugins": "workspace:*",

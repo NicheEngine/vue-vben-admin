@@ -31,9 +31,9 @@ verifyDepsBeforeRun: false
 minimumReleaseAge: 0
 
 overrides:
-  '@types/node': 'catalog:'
   '@ast-grep/napi': 'catalog:'
   '@ctrl/tinycolor': 'catalog:'
+  '@types/node': 'catalog:'
   clsx: 'catalog:'
   pinia: 'catalog:'
   vue: 'catalog:'
