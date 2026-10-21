@@ -19,8 +19,6 @@
   "dependencies": {
     "@vben-core/shared": "workspace:*",
     "@vben-core/typings": "workspace:*",
-    "@vben/utils": "workspace:*",
-    "@vueuse/core": "catalog:",
     "hls.js": "catalog:",
     "mpegts.js": "catalog:",
     "vue": "catalog:"

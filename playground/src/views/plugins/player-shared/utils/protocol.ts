@@ -75,26 +75,58 @@ export function detectProtocol(url: string): ProtocolInfo {
   };
 }
 
-/**
- * 探测 URL 是否能访问（HEAD 请求）
- */
-export async function probeUrl(url: string): Promise<{
+export interface ProbeResult {
   ok: boolean;
   status?: number;
   contentType?: string;
   error?: string;
-}> {
+  mismatch?: boolean;
+}
+
+/**
+ * 探测 URL 是否可访问。
+ * GET + Range: bytes=0-0 只取首字节，5s 超时。
+ */
+export async function probeUrl(url: string): Promise<ProbeResult> {
+  const protocol = detectProtocol(url).protocol;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+
   try {
-    const resp = await fetch(url, { method: 'HEAD' });
-    return {
-      ok: resp.ok,
-      status: resp.status,
-      contentType: resp.headers.get('content-type') ?? undefined,
-    };
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+      signal: controller.signal,
+    });
+
+    const contentType = (resp.headers.get('content-type') ?? '').toLowerCase();
+    const isFlv = protocol.includes('flv');
+    const isHls = protocol === 'hls';
+
+    try {
+      resp.body?.cancel();
+    } catch {
+      /* ignore */
+    }
+
+    const mismatch =
+      (isFlv &&
+        !contentType.includes('flv') &&
+        !contentType.includes('octet-stream')) ||
+      (isHls &&
+        !contentType.includes('mpegurl') &&
+        !contentType.includes('text'));
+
+    return { ok: resp.ok, status: resp.status, contentType, mismatch };
   } catch (error: any) {
     return {
       ok: false,
-      error: error?.message || '请求失败',
+      error:
+        error?.name === 'AbortError'
+          ? '探测超时（5s）'
+          : error?.message || '请求失败',
     };
+  } finally {
+    clearTimeout(timer);
   }
 }

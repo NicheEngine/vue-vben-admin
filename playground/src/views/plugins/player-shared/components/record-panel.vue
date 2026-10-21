@@ -5,6 +5,7 @@ import { Button, Card, Tag } from 'antdv-next';
 
 const props = defineProps<{
   isRecording: boolean;
+  recordingDuration: number;
   startRecord: (fileName?: string, fileType?: string) => void;
   stopRecordAndSave: () => void;
 }>();
@@ -40,7 +41,6 @@ function startTimer() {
   }, 200);
 }
 
-/** 外部 isRecording 变化时同步本地计时器 */
 watch(
   () => props.isRecording,
   (recording) => {

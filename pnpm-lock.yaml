@@ -1086,15 +1086,6 @@ importers:
       '@vben-core/shared':
         specifier: workspace:*
         version: link:../../packages/@core/base/shared
-      '@vben-core/typings':
-        specifier: workspace:*
-        version: link:../../packages/@core/base/typings
-      '@vben/types':
-        specifier: workspace:*
-        version: link:../../packages/types
-      '@vben/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
       vue:
         specifier: 3.5.41
         version: 3.5.41(typescript@6.0.3)
@@ -1111,12 +1102,6 @@ importers:
       '@vben-core/typings':
         specifier: workspace:*
         version: link:../../packages/@core/base/typings
-      '@vben/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
-      '@vueuse/core':
-        specifier: 'catalog:'
-        version: 14.4.0(vue@3.5.41(typescript@6.0.3))
       hls.js:
         specifier: 'catalog:'
         version: 1.7.3
@@ -2185,6 +2170,9 @@ importers:
       '@vben/layouts':
         specifier: workspace:*
         version: link:../packages/effects/layouts
+      '@vben/live-player':
+        specifier: workspace:*
+        version: link:../external/live-player
       '@vben/locales':
         specifier: workspace:*
         version: link:../packages/locales

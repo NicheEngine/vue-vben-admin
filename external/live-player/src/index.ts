@@ -1,6 +1,10 @@
+import type Mpegts from 'mpegts.js';
 export { LivePlayerApi } from './live-player-api';
 export { default as LivePlayer } from './live-player.vue';
+export { LiveType } from './types';
 export type * from './types';
 export { setDefaultLivePlayerProps, useLivePlayer } from './use-live-player';
+export type { HlsConfig } from 'hls.js';
 export { default as Hls } from 'hls.js';
+export type MpegtsConfig = Mpegts.Config;
 export { default as Mpegts } from 'mpegts.js';

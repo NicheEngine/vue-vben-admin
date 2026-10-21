@@ -3,7 +3,7 @@ import type { Ref } from 'vue';
 import type { JessibucaPlayerApi } from './jessibuca-player-api';
 
 export interface JessibucaConfig {
-  // ...（配置项保持不变，此处省略，见原文件）
+  // ...（原有配置项保持不变，此处保留你文件中的全部字段）
 
   autoPlay?: boolean;
   isMute?: boolean;
@@ -74,6 +74,11 @@ export interface JessibucaConfig {
   [key: string]: any;
 }
 
+/**
+ * Jessibuca 实例接口（项目用到的子集）。
+ * 完整定义：node_modules/jessibuca/d.ts/jessibuca.d.ts（若存在）
+ * 未使用官方类型时以此为准，全局 window.Jessibuca 复用此类型。
+ */
 export interface JessibucaInstance {
   play: (url?: string, options?: any) => Promise<void>;
   pause: () => Promise<void>;
@@ -119,6 +124,8 @@ export interface JessibucaState {
   currentTime: number;
   networkDelay: number;
   isRecording: boolean;
+  /** 录制已时长（ms），由 Jessibuca recording 事件上报 */
+  recordingDuration: number;
 }
 
 export type JessibucaStoreState = JessibucaState & {
@@ -169,7 +176,14 @@ export interface JessibucaCallbacks {
 }
 
 export interface JessibucaApiOptions
-  extends JessibucaCallbacks, Partial<JessibucaStoreState> {}
+  extends JessibucaCallbacks, Partial<JessibucaStoreState> {
+  /** 初始地址（创建时生效一次，后续用 setUrl） */
+  initialUrl?: string;
+  /** 初始配置（创建时生效一次，后续用 setConfig） */
+  initialConfig?: JessibucaConfig;
+  /** 初始状态（创建时生效一次） */
+  initialState?: Partial<JessibucaState>;
+}
 
 export interface ExtendedJessibucaApi extends JessibucaPlayerApi {
   useSelector: <T = JessibucaStoreState>(

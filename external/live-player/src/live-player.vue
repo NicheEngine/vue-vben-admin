@@ -1,12 +1,13 @@
 <script lang="ts" setup>
 import type {
-  ExtendedLivePlayerApi,
+  LivePlayerEmits,
   LivePlayerProps,
   LivePlayerStoreState,
 } from './types';
 
 import {
   computed,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   reactive,
@@ -17,48 +18,84 @@ import {
 import Hls from 'hls.js';
 import Mpegts from 'mpegts.js';
 
+import { LivePlayerApi } from './live-player-api';
 import { LiveType } from './types';
 
 const props = withDefaults(
-  defineProps<LivePlayerProps & { livePlayerApi?: ExtendedLivePlayerApi }>(),
+  defineProps<LivePlayerProps & { livePlayerApi?: LivePlayerApi }>(),
   {
     autoplay: true,
     controls: true,
-    muted: false,
+    muted: true,
+    hlsOptions: undefined,
+    mpegtsOptions: undefined,
+    type: undefined,
     livePlayerApi: undefined,
   },
 );
+
+const emit = defineEmits<LivePlayerEmits>();
 
 const videoRef = ref<HTMLVideoElement>();
 let hlsPlayer: Hls | null = null;
 let mpegtsPlayer: Mpegts.Player | null = null;
 
-const api = props.livePlayerApi;
-const isApiMode = !!api;
+let sessionId = 0;
 
-// 非 API 模式用本地 reactive 状态，保证模板能响应
-const localState = reactive<{
-  isLoading: boolean;
-  error: null | string;
-}>({
+const ownsApi = !props.livePlayerApi;
+const api = props.livePlayerApi ?? new LivePlayerApi();
+
+if (typeof api.setComponentCallbacks === 'function') {
+  api.setComponentCallbacks({
+    onPlay: () => emit('play'),
+    onPause: () => emit('pause'),
+    onError: (err) => emit('error', err),
+    onLoadStart: () => emit('loadStart'),
+    onLoadEnd: () => emit('loadEnd'),
+    onReady: () => emit('ready'),
+    onTimeUpdate: (t) => emit('timeUpdate', t),
+    onVolumeChange: (v) => emit('volumeChange', v),
+  });
+}
+
+const isApiMode = !!props.livePlayerApi;
+
+const localState = reactive<Pick<LivePlayerStoreState, 'error' | 'isLoading'>>({
   isLoading: false,
   error: null,
 });
 
-const stateRef = api?.useSelector?.() ?? api?.useStore?.();
-const state = computed<Partial<LivePlayerStoreState>>(() =>
-  isApiMode && stateRef ? stateRef.value : localState,
+const state = computed<Pick<LivePlayerStoreState, 'error' | 'isLoading'>>(() =>
+  isApiMode
+    ? { error: api.store.state.error, isLoading: api.store.state.isLoading }
+    : localState,
 );
 
-const url = computed(() => props.url ?? state.value.url ?? '');
-const autoplay = computed(() => props.autoplay ?? state.value.autoplay ?? true);
-const muted = computed(() => props.muted ?? state.value.muted ?? false);
-const controls = computed(() => props.controls ?? state.value.controls ?? true);
-const type = computed(() => props.type ?? state.value.type);
-const hlsOptions = computed(() => props.hlsOptions ?? state.value.hlsOptions);
-const mpegtsOptions = computed(
-  () => props.mpegtsOptions ?? state.value.mpegtsOptions,
+const url = computed(() => props.url ?? api.store.state.url ?? '');
+const autoplay = computed(
+  () => props.autoplay ?? api.store.state.autoplay ?? true,
 );
+const muted = computed(() => props.muted ?? api.store.state.muted ?? true);
+const controls = computed(
+  () => props.controls ?? api.store.state.controls ?? true,
+);
+const type = computed(() => props.type ?? api.store.state.type);
+const hlsOptions = computed(
+  () => props.hlsOptions ?? api.store.state.hlsOptions,
+);
+const mpegtsOptions = computed(
+  () => props.mpegtsOptions ?? api.store.state.mpegtsOptions,
+);
+
+function setLoading(loading: boolean) {
+  if (isApiMode) api.setLoading(loading);
+  else localState.isLoading = loading;
+}
+
+function setError(error: null | string) {
+  if (isApiMode) api.setError(error);
+  else localState.error = error;
+}
 
 function destroyLivePlayer() {
   if (hlsPlayer) {
@@ -71,165 +108,207 @@ function destroyLivePlayer() {
   }
 }
 
-function setLoading(loading: boolean) {
-  if (isApiMode && api) api.setLoading(loading);
-  else localState.isLoading = loading;
-}
-
-function setError(error: null | string) {
-  if (isApiMode && api) api.setError(error);
-  else localState.error = error;
-}
-
-function setReady(ready: boolean) {
-  if (isApiMode && api) api.updateReady(ready);
-}
-
-function loadHls(resource: string) {
+function loadHls(resource: string, sid: number) {
   if (!Hls.isSupported()) {
     if (videoRef.value?.canPlayType('application/vnd.apple.mpegURL')) {
       videoRef.value.src = resource;
       return;
     }
-    const message = `HLS not supported for ${resource}`;
-    console.error(message);
-    setError(message);
+    setError(`HLS not supported`);
     return;
   }
-  const livePlayer = new Hls(hlsOptions.value);
-  hlsPlayer = livePlayer;
-  livePlayer.loadSource(resource);
-  if (videoRef.value) livePlayer.attachMedia(videoRef.value);
-  livePlayer.on(Hls.Events.MANIFEST_PARSED, () => {
-    setReady(true);
-    if (autoplay.value && videoRef.value) videoRef.value.play();
-  });
-  livePlayer.on(Hls.Events.ERROR, (_event, data) => {
-    if (data.fatal) {
-      switch (data.type) {
-        case Hls.ErrorTypes.MEDIA_ERROR: {
-          livePlayer.recoverMediaError();
-          break;
-        }
-        case Hls.ErrorTypes.NETWORK_ERROR: {
-          livePlayer.startLoad();
-          break;
-        }
-        default: {
-          livePlayer.destroy();
-          hlsPlayer = null;
-          setError(data.details);
-          break;
-        }
-      }
+  const player = new Hls(hlsOptions.value);
+  hlsPlayer = player;
+  player.loadSource(resource);
+  if (videoRef.value) player.attachMedia(videoRef.value);
+
+  player.on(Hls.Events.MANIFEST_PARSED, () => {
+    if (sid !== sessionId) return;
+    if (autoplay.value && videoRef.value) {
+      videoRef.value.play().catch(() => {});
     }
   });
+
+  // HLS 统计数据
+  let hlsTimer = setInterval(() => {
+    if (sid === sessionId && isApiMode && hlsPlayer) {
+      const vbps = (hlsPlayer as any).bandwidthEstimate || 0;
+      const buf = videoRef.value?.buffered.length
+        ? (videoRef.value.buffered.end(0) - videoRef.value.currentTime) * 1000
+        : 0;
+      api.updateStats({
+        buf,
+        fps: 30,
+        abps: 0,
+        vbps,
+        ts: videoRef.value?.currentTime || 0,
+      });
+      api.updateVideoSize(
+        videoRef.value?.videoWidth || 0,
+        videoRef.value?.videoHeight || 0,
+      );
+    }
+  }, 1000);
+  player.on(Hls.Events.DESTROYING, () => clearInterval(hlsTimer));
 }
 
-function loadMpegts(resource: string) {
+function loadMpegts(resource: string, sid: number) {
   if (!Mpegts.getFeatureList().mseLivePlayback) {
-    const message = `MPEGTS not supported for ${resource}`;
-    console.error(message);
-    setError(message);
+    setError(`MPEGTS not supported`);
     return;
   }
-  const opts = mpegtsOptions.value;
-  const livePlayer = Mpegts.createPlayer(
+
+  const opts = mpegtsOptions.value || {};
+
+  // 👇 终极极简配置：关闭所有自动追帧和同步，防止内部死锁
+  const mergedConfig = {
+    enableStashBuffer: false, // 关闭缓存池，来了就播
+    autoCleanupSourceBuffer: true, // 自动清理旧数据，防止内存溢出
+    // 关键：彻底关闭 liveSync 及其相关参数
+    liveSync: false,
+    // 关闭懒加载和延迟加载，强制立即解析
+    lazyLoad: false,
+    deferLoadAfterSourceOpen: false,
+    // 关闭音频时间戳修复，避免生成静音帧干扰
+    fixAudioTimestampGap: false,
+    // 移除 startupStallDuration，让 mpegts 使用默认行为（或者设为 0 彻底关闭检测）
+    ...opts.config,
+  };
+
+  const player = Mpegts.createPlayer(
     {
-      ...opts?.datasource,
+      type: 'flv',
+      isLive: true,
+      ...opts.datasource,
       url: resource,
     } as Mpegts.MediaDataSource,
-    opts?.config,
+    mergedConfig,
   );
-  mpegtsPlayer = livePlayer;
-  livePlayer.on(Mpegts.Events.MEDIA_INFO, () => {
-    setReady(true);
-    if (autoplay.value) livePlayer.play();
-  });
-  livePlayer.on(Mpegts.Events.ERROR, (_event, data) => {
-    if (data.fatal) {
-      switch (data.type) {
-        case Mpegts.ErrorTypes.MEDIA_ERROR: {
-          livePlayer.unload();
-          break;
+
+  mpegtsPlayer = player;
+
+  // 监听 MediaInfo，拿到元数据后立刻播放
+  player.on(Mpegts.Events.MEDIA_INFO, () => {
+    if (sid !== sessionId) return;
+    if (autoplay.value) {
+      // 稍微延迟一点点，确保 MSE 的 SourceBuffer 处于 open 状态
+      setTimeout(() => {
+        if (mpegtsPlayer) {
+          mpegtsPlayer.play();
         }
-        case Mpegts.ErrorTypes.NETWORK_ERROR: {
-          livePlayer.load();
-          break;
-        }
-        default: {
-          livePlayer.destroy();
-          mpegtsPlayer = null;
-          setError(data.details);
-          break;
-        }
-      }
+      }, 100);
     }
   });
-  if (videoRef.value) livePlayer.attachMediaElement(videoRef.value);
-  livePlayer.load();
+
+  // 监听错误，如果是严重错误则自动重试
+  player.on(Mpegts.Events.ERROR, (errorType, errorDetail) => {
+    if (sid !== sessionId) return;
+    console.warn('[Mpegts] Playback error:', errorType, errorDetail);
+    // 如果是网络或媒体错误，尝试重新加载
+    if (
+      errorType === Mpegts.ErrorTypes.NETWORK_ERROR ||
+      errorType === Mpegts.ErrorTypes.MEDIA_ERROR
+    ) {
+      setTimeout(() => {
+        if (sid === sessionId) refresh();
+      }, 1000);
+    }
+  });
+
+  // 统计信息（保留你的码率计算）
+  player.on(Mpegts.Events.STATISTICS_INFO, (info: any) => {
+    if (sid !== sessionId || !isApiMode) return;
+    const vbps = (info.speed || 0) * 1024;
+    let buf = 0;
+    if (videoRef.value && videoRef.value.buffered.length > 0) {
+      const curTime = videoRef.value.currentTime;
+      const bufferedEnd = videoRef.value.buffered.end(
+        videoRef.value.buffered.length - 1,
+      );
+      buf = Math.max(0, (bufferedEnd - curTime) * 1000);
+    }
+    api.updateStats({
+      buf,
+      fps: info.decodedFrames || 30,
+      abps: 0,
+      vbps,
+      ts: videoRef.value?.currentTime || 0,
+    });
+    api.updateVideoSize(
+      videoRef.value?.videoWidth || 0,
+      videoRef.value?.videoHeight || 0,
+    );
+  });
+
+  if (videoRef.value) player.attachMediaElement(videoRef.value);
+  player.load();
 }
 
 function refresh() {
   if (!videoRef.value) return;
   const targetUrl = url.value;
   if (!targetUrl) {
-    console.warn('[LivePlayer] URL is empty');
+    destroyLivePlayer();
     return;
   }
+
+  sessionId++;
+  const sid = sessionId;
+
   destroyLivePlayer();
   setLoading(true);
   setError(null);
 
-  let useHls: boolean;
-  if (type.value === LiveType.HLS) useHls = true;
-  else if (type.value === LiveType.MPEGTS) useHls = false;
-  else useHls = targetUrl.includes('.m3u8');
+  // 👇 修复 ESLint 报错
+  const lowerUrl = targetUrl.toLowerCase();
+  let useHls: boolean; // 移除 = false 的初始赋值
 
-  if (useHls) loadHls(targetUrl);
-  else loadMpegts(targetUrl);
+  if (lowerUrl.includes('.m3u8')) {
+    useHls = true;
+  } else if (lowerUrl.includes('.flv')) {
+    useHls = false;
+  } else {
+    useHls = type.value === LiveType.HLS;
+  }
+
+  if (useHls) loadHls(targetUrl, sid);
+  else loadMpegts(targetUrl, sid);
 }
+
+// 暂停防抖：防止 @play 事件意外触发导致 UI 闪烁
+let lastPauseTime = 0;
 
 function onPlay() {
-  if (isApiMode && api) api.updatePlaying(true);
+  // 如果刚刚才触发了 pause，忽略这个 play 事件
+  if (Date.now() - lastPauseTime < 300) return;
+  if (isApiMode) api.updatePlaying(true);
 }
+
 function onPause() {
-  if (isApiMode && api) api.updatePlaying(false);
+  lastPauseTime = Date.now();
+  if (isApiMode) api.updatePlaying(false);
 }
+
 function onTimeUpdate() {
-  if (isApiMode && api && videoRef.value) {
+  if (isApiMode && videoRef.value) {
     api.updateCurrentTime(videoRef.value.currentTime);
   }
 }
 function onVolumeChange() {
-  if (isApiMode && api && videoRef.value) {
-    api.setVolume(videoRef.value.volume);
-  }
+  if (isApiMode && videoRef.value) api.setVolume(videoRef.value.volume);
 }
 function onCanPlay() {
   setLoading(false);
 }
-function onError() {
-  if (videoRef.value?.error) setError(videoRef.value.error.message);
-}
 
-watch(url, (newUrl, oldUrl) => {
-  if (newUrl && newUrl !== oldUrl) refresh();
+watch(url, (n, o) => {
+  if (n !== o) refresh();
 });
 watch(type, () => {
   if (url.value) refresh();
 });
 
-if (isApiMode && api) {
-  watch(
-    () => api.store.state.isPlaying,
-    (playing) => {
-      if (videoRef.value) {
-        if (playing) videoRef.value.play();
-        else videoRef.value.pause();
-      }
-    },
-  );
+if (isApiMode) {
   watch(
     () => api.store.state.volume,
     (vol) => {
@@ -242,27 +321,21 @@ if (isApiMode && api) {
       if (videoRef.value) videoRef.value.muted = m ?? false;
     },
   );
-  watch(
-    () => api.store.state.currentTime,
-    (time) => {
-      if (
-        videoRef.value &&
-        Math.abs(videoRef.value.currentTime - (time ?? 0)) > 0.1
-      ) {
-        videoRef.value.currentTime = time ?? 0;
-      }
-    },
-  );
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await nextTick();
+  if (videoRef.value) videoRef.value.muted = muted.value;
   if (url.value) refresh();
 });
 
 onBeforeUnmount(() => {
+  sessionId++;
   destroyLivePlayer();
-  // 注意：destroy API 由创建者负责，组件不主动 destroy
+  if (ownsApi) api.destroy();
 });
+
+defineExpose({ api });
 </script>
 
 <template>
@@ -274,7 +347,6 @@ onBeforeUnmount(() => {
       :muted="muted"
       class="h-full w-full"
       @canplay="onCanPlay"
-      @error="onError"
       @pause="onPause"
       @play="onPlay"
       @timeupdate="onTimeUpdate"
@@ -288,7 +360,7 @@ onBeforeUnmount(() => {
     </div>
     <div
       v-if="state.error"
-      class="absolute inset-0 flex items-center justify-center bg-black/75 text-white"
+      class="absolute inset-0 flex items-center justify-center bg-black/75 px-4 text-center text-white"
     >
       <slot name="error">{{ state.error }}</slot>
     </div>

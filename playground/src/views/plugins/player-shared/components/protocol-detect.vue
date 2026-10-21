@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { ProtocolInfo } from '../utils/protocol';
+import type { ProbeResult, ProtocolInfo } from '../utils/protocol';
 
 import { computed, ref } from 'vue';
 
@@ -7,9 +7,7 @@ import { Button, Input, Tag } from 'antdv-next';
 
 import { detectProtocol, probeUrl } from '../utils/protocol';
 
-const props = defineProps<{
-  modelValue: string;
-}>();
+const props = defineProps<{ modelValue: string }>();
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -25,12 +23,21 @@ const url = computed({
 const info = computed<ProtocolInfo>(() => detectProtocol(url.value));
 
 const probing = ref(false);
-const probeResult = ref<null | {
-  ok: boolean;
-  status?: number;
-  contentType?: string;
-  error?: string;
-}>(null);
+const probeResult = ref<null | ProbeResult>(null);
+
+// 点击应用时，触发自动探测
+async function handleApply() {
+  if (!url.value) return;
+  emit('apply', url.value);
+
+  probing.value = true;
+  probeResult.value = null;
+  try {
+    probeResult.value = await probeUrl(url.value);
+  } finally {
+    probing.value = false;
+  }
+}
 
 async function handleProbe() {
   if (!url.value) return;
@@ -42,6 +49,12 @@ async function handleProbe() {
     probing.value = false;
   }
 }
+
+function handleReset() {
+  url.value = '';
+  probeResult.value = null;
+  emit('reset');
+}
 </script>
 
 <template>
@@ -52,10 +65,10 @@ async function handleProbe() {
         class="min-w-[320px] flex-1"
         placeholder="ws://...flv / http://...flv / https://...m3u8"
         allow-clear
-        @keydown.enter="emit('apply', url)"
+        @keydown.enter="handleApply"
       />
-      <Button type="primary" @click="emit('apply', url)">应用</Button>
-      <Button @click="emit('reset')">恢复</Button>
+      <Button type="primary" @click="handleApply">应用</Button>
+      <Button @click="handleReset">重置</Button>
       <Button :loading="probing" @click="handleProbe">探测</Button>
     </div>
 
@@ -65,9 +78,13 @@ async function handleProbe() {
       <span class="text-foreground/50">{{ info.description }}</span>
     </div>
 
-    <div v-if="probeResult" class="text-sm">
+    <!-- 完整的探测结果展示 -->
+    <div
+      v-if="probeResult"
+      class="mt-2 flex flex-wrap items-center gap-2 text-sm"
+    >
       <span class="text-foreground/60">探测结果：</span>
-      <Tag :color="probeResult.ok ? 'green' : 'red'">
+      <Tag :color="probeResult.ok ? 'success' : 'error'">
         {{ probeResult.ok ? '可访问' : '不可访问' }}
       </Tag>
       <span v-if="probeResult.status" class="ml-2 text-foreground/50">

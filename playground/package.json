@@ -41,6 +41,7 @@
     "@vben/icons": "workspace:*",
     "@vben/jessibuca-player": "workspace:*",
     "@vben/layouts": "workspace:*",
+    "@vben/live-player": "workspace:*",
     "@vben/locales": "workspace:*",
     "@vben/plugins": "workspace:*",
     "@vben/preferences": "workspace:*",

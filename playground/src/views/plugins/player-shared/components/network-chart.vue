@@ -3,17 +3,11 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
-    /** 数值，比如 buf(ms) 或 kBps */
     value: number;
-    /** 最大值（用于归一化） */
     max?: number;
-    /** 颜色 */
     color?: string;
-    /** 标题 */
     label?: string;
-    /** 单位 */
     unit?: string;
-    /** 保留多少帧 */
     capacity?: number;
   }>(),
   {
@@ -31,6 +25,17 @@ const maxValue = ref(props.max);
 
 let observer: null | ResizeObserver = null;
 
+function recomputeMax() {
+  const window = data.value.slice(-props.capacity);
+  const peak = Math.max(props.max, ...window);
+  const target = peak * 1.2;
+  if (target > maxValue.value * 1.5) {
+    maxValue.value = target;
+    return;
+  }
+  maxValue.value = maxValue.value * 0.9 + target * 0.1;
+}
+
 watch(
   () => props.max,
   (v) => {
@@ -45,7 +50,7 @@ watch(
     if (typeof v !== 'number' || Number.isNaN(v)) return;
     data.value.push(v);
     if (data.value.length > props.capacity) data.value.shift();
-    if (v > maxValue.value) maxValue.value = v * 1.2;
+    recomputeMax();
     draw();
   },
 );
@@ -61,19 +66,16 @@ function draw() {
   const cssHeight = canvas.clientHeight;
   if (cssWidth === 0 || cssHeight === 0) return;
 
-  // 只在尺寸真正变化时重设并重置变换
   if (canvas.width !== cssWidth * dpr || canvas.height !== cssHeight * dpr) {
     canvas.width = cssWidth * dpr;
     canvas.height = cssHeight * dpr;
   }
-  // 用 setTransform 替代 scale，避免累积缩放
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const w = cssWidth;
   const h = cssHeight;
   ctx.clearRect(0, 0, w, h);
 
-  // 网格
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
   for (let i = 1; i < 4; i++) {
@@ -89,7 +91,6 @@ function draw() {
   const max = maxValue.value || 1;
   const step = w / (props.capacity - 1);
 
-  // 折线
   ctx.strokeStyle = props.color;
   ctx.lineWidth = 1.6;
   ctx.beginPath();
@@ -101,7 +102,6 @@ function draw() {
   });
   ctx.stroke();
 
-  // 面积填充
   ctx.fillStyle = `${props.color}33`;
   ctx.beginPath();
   ctx.moveTo(0, h);

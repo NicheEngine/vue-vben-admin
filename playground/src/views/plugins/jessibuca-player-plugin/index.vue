@@ -3,6 +3,7 @@ import type { JessibucaConfig } from '@vben/jessibuca-player';
 
 import {
   computed,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   reactive,
@@ -23,19 +24,21 @@ import {
   Tag,
 } from 'antdv-next';
 
+import {
+  createJessibucaAdapter,
+  NetworkChart,
+  PlayStatusPanel,
+  ProtocolDetect,
+  RecordPanel,
+  ScreenshotPreview,
+} from '../player-shared';
 import MultiScreenCompare from './components/multi-screen-compare.vue';
-import NetworkChart from './components/network-chart.vue';
-import PlayStatusPanel from './components/play-status-panel.vue';
-import ProtocolDetect from './components/protocol-detect.vue';
-import RecordPanel from './components/record-panel.vue';
-import ScreenshotPreview from './components/screenshot-preview.vue';
 
 defineOptions({ name: 'JessibucaPluginExample' });
 
 // ============================================================
-// 一、库加载校验
+// 一、库加载与静态资源校验
 // ============================================================
-
 const jessibucaReady = ref(false);
 const decoderJsOk = ref<boolean | null>(null);
 const decoderWasmOk = ref<boolean | null>(null);
@@ -69,26 +72,19 @@ async function runFullCheck() {
 }
 
 let checkTimer: null | ReturnType<typeof setInterval> = null;
-
 function startPolling() {
-  if (checkTimer) {
-    clearInterval(checkTimer);
-    checkTimer = null;
-  }
+  if (checkTimer) clearInterval(checkTimer);
+  checkTimer = null;
   let count = 0;
   checkTimer = setInterval(async () => {
     count += 1;
-    const stop = () => {
-      if (checkTimer) {
-        clearInterval(checkTimer);
-        checkTimer = null;
-      }
-    };
     if (checkJessibuca()) {
-      stop();
+      if (checkTimer) clearInterval(checkTimer);
+      checkTimer = null;
       await runFullCheck();
     } else if (count > 15) {
-      stop();
+      if (checkTimer) clearInterval(checkTimer);
+      checkTimer = null;
     }
   }, 200);
 }
@@ -101,40 +97,40 @@ async function recheckJessibuca() {
 }
 
 const jessibucaViteConfig = `application: {
-  // 开启 插件依赖注入（包括拷贝资源文件、index.html 注入库文件引用）
   depend: true,
   dependOptions: {
-    // 打包构建时 开启插件依赖注入
     build: true,
-    // 开发调试时 开启插件依赖注入
     serve: true,
-    // 依赖选项
     depends: {
-      // jessibuca 相关选项配置
       jessibuca: {
-        // source 从何处拷贝库文件
         source: '../libraries/jessibuca',
       },
     },
   },
 },`;
 
-// ============================================================
-// 二、播放器配置
-// ============================================================
+const decoderJsStatus = computed(() =>
+  decoderJsOk.value === false ? '缺失' : '正常',
+);
+const decoderWasmStatus = computed(() =>
+  decoderWasmOk.value === false ? '缺失' : '正常',
+);
 
+// ============================================================
+// 二、播放器实例与配置
+// ============================================================
 const DEFAULT_URL = '';
 const inputUrl = ref(DEFAULT_URL);
 const currentUrl = ref(DEFAULT_URL);
 const urlHistory = ref<string[]>([]);
 
-/** 实时码率 kBps（提前声明，供 onStats 闭包使用） */
-const currentKbps = ref(0);
+// 👇 新增：是否清除了画面的状态
+const isCleared = ref(false);
 
 const config = reactive<JessibucaConfig>({
   autoPlay: true,
   isMute: true,
-  debug: true,
+  debug: false,
   decoder: '/jessibuca/decoder.js',
   timeout: 10,
   videoBuffer: 0.5,
@@ -150,66 +146,15 @@ const config = reactive<JessibucaConfig>({
   heartTimeoutReplayTimes: 0,
 });
 
-// 只传回调，url/config 交给组件 props 单向管理
-const [Player, api] = useJessibucaPlayer({
-  url: currentUrl.value,
-  config: { ...config },
-  onStats: (stats) => {
-    currentKbps.value = (stats.vbps || 0) / 8 / 1024;
-  },
-});
+const [Player, jessibucaApi] = useJessibucaPlayer({ config });
+
+const player = createJessibucaAdapter(jessibucaApi);
 
 // ============================================================
-// 三、状态
+// 三、画面尺寸与比例控制
 // ============================================================
-
-const scaleMode = api.useSelector((s) => s.config.scaleMode);
-const isPlaying = api.useSelector((s) => s.isPlaying);
-const isLoading = api.useSelector((s) => s.isLoading);
-const errorMsg = api.useSelector((s) => s.error);
-const videoWidth = api.useSelector((s) => s.videoWidth);
-const videoHeight = api.useSelector((s) => s.videoHeight);
-const networkDelay = api.useSelector((s) => s.networkDelay);
-const isMuted = api.useSelector((s) => s.isMuted);
-const isRecording = api.useSelector((s) => s.isRecording);
-const volume = api.useSelector((s) => s.volume);
-
-const videoRatio = computed(() => {
-  if (!videoWidth.value || !videoHeight.value) return '-';
-  return (videoWidth.value / videoHeight.value).toFixed(2);
-});
-
-const scaleModeLabel = computed(() => {
-  switch (scaleMode.value) {
-    case 0: {
-      return '拉伸填满';
-    }
-    case 1: {
-      return '等比留黑边';
-    }
-    case 2: {
-      return '等比裁切';
-    }
-    default: {
-      return '未知';
-    }
-  }
-});
-
-const decoderJsStatus = computed(() =>
-  decoderJsOk.value === false ? '缺失' : '正常',
-);
-const decoderWasmStatus = computed(() =>
-  decoderWasmOk.value === false ? '缺失' : '正常',
-);
-
-// ============================================================
-// 四、画面尺寸
-// ============================================================
-
 type SizeMode = 'auto' | 'fixed' | 'ratio';
 const sizeMode = ref<SizeMode>('auto');
-
 const fixedWidth = ref(800);
 const fixedHeight = ref(450);
 
@@ -227,19 +172,13 @@ const ratioBaseWidth = ref(960);
 
 const containerStyle = computed(() => {
   if (sizeMode.value === 'fixed') {
-    return {
-      width: `${fixedWidth.value}px`,
-      height: `${fixedHeight.value}px`,
-    };
+    return { width: `${fixedWidth.value}px`, height: `${fixedHeight.value}px` };
   }
   if (sizeMode.value === 'ratio') {
     const opt =
       ratioOptions.find((o) => o.value === ratio.value) ?? DEFAULT_RATIO;
     const height = Math.round((ratioBaseWidth.value * opt.h) / opt.w);
-    return {
-      width: `${ratioBaseWidth.value}px`,
-      height: `${height}px`,
-    };
+    return { width: `${ratioBaseWidth.value}px`, height: `${height}px` };
   }
   return { width: '100%', height: '480px' };
 });
@@ -258,20 +197,33 @@ const containerRatio = computed(() => {
   return '-';
 });
 
-/** 多屏对比开关（默认关闭，避免 3 路并发） */
+const videoRatio = computed(() => {
+  if (!player.videoWidth.value || !player.videoHeight.value) return '-';
+  return (player.videoWidth.value / player.videoHeight.value).toFixed(2);
+});
+
+const SCALE_MODE_LABELS: Record<0 | 1 | 2, string> = {
+  0: '拉伸填满',
+  1: '等比留黑边',
+  2: '等比裁切',
+};
+const scaleModeLabel = computed(
+  () => SCALE_MODE_LABELS[player.scaleMode.value],
+);
+
+// ============================================================
+// 四、多屏对比开关
+// ============================================================
 const showMultiScreen = ref(false);
 
 // ============================================================
 // 五、交互
 // ============================================================
-
 function applyUrl(u?: string) {
   const value = (u ?? inputUrl.value).trim();
   if (!value) return;
-
-  // 只改 props.url，组件 watch 会同步到 api 并（autoPlay 时）播放
+  isCleared.value = false; // 👈 重置清除状态
   currentUrl.value = value;
-
   const history = urlHistory.value.filter((h) => h !== value);
   history.unshift(value);
   urlHistory.value = history.slice(0, 10);
@@ -279,69 +231,134 @@ function applyUrl(u?: string) {
 
 function resetUrl() {
   inputUrl.value = DEFAULT_URL;
-  applyUrl();
+  currentUrl.value = DEFAULT_URL;
+  urlHistory.value = [];
+  isCleared.value = false; // 👈 重置清除状态
+  void jessibucaApi.clearView();
 }
 
 function handleToggle() {
-  api.toggle();
+  if (isCleared.value) {
+    isCleared.value = false;
+    void jessibucaApi.play();
+    return;
+  }
+  if (player.isPlaying.value) {
+    void jessibucaApi.pause();
+  } else {
+    void jessibucaApi.play();
+  }
 }
 
 function handleReload() {
-  // currentUrl 未变，watch 不触发，显式重播
-  void api.play();
+  isCleared.value = false; // 👈 重置清除状态
+  player.setLoading?.(true);
+  void jessibucaApi.play();
+}
+
+// 👇 核心修改：将适配容器改为全屏播放
+function handleFullscreen() {
+  const wrapper = document.querySelector('.jessibuca-player-wrapper');
+  const el = wrapper?.parentElement;
+
+  if (!el) return;
+
+  if (document.fullscreenElement) {
+    document
+      .exitFullscreen()
+      .then(() => {
+        nextTick(() => {
+          setTimeout(() => {
+            jessibucaApi.resize();
+          }, 100);
+        });
+      })
+      .catch(console.warn);
+  } else {
+    el.requestFullscreen()
+      .then(() => {
+        nextTick(() => {
+          setTimeout(() => {
+            jessibucaApi.resize();
+          }, 100);
+        });
+      })
+      .catch((error) => {
+        console.warn('全屏失败:', error);
+      });
+  }
+}
+
+function handleFullscreenChange() {
+  nextTick(() => {
+    setTimeout(() => {
+      jessibucaApi.resize();
+    }, 100);
+  });
 }
 
 function handleMuteChange(checked: boolean) {
-  config.isMute = checked; // 同步 reactive config，避免下次 watch 回退
-  checked ? api.mute() : api.cancelMute();
+  config.isMute = checked;
+  checked ? jessibucaApi.mute() : jessibucaApi.cancelMute();
 }
 
 function handleVolumeChange(value: number) {
   config.volume = value;
-  api.setVolume(value);
+  jessibucaApi.setVolume(value);
+  // 如果拖到 0，直接触发静音
+  if (value === 0) {
+    config.isMute = true;
+    jessibucaApi.mute();
+  } else if (config.isMute) {
+    // 如果拖拽大于 0，且当前处于静音状态，自动取消静音
+    config.isMute = false;
+    jessibucaApi.cancelMute();
+  }
 }
 
 function handleScaleModeChange(mode: 0 | 1 | 2) {
   config.scaleMode = mode;
-  api.setScaleMode(mode);
+  jessibucaApi.setScaleMode(mode);
 }
 
-/**
- * 截图。
- * 注意：只传 filename，让 Jessibuca 用默认格式；
- * 传 undefined 会触发 `r.split is not a function`。
- */
 function handleScreenshot(): string {
-  const result = api.screenshot(`jessibuca-${Date.now()}`, 'png', 1, 'base64');
+  const result = jessibucaApi.screenshot();
   return typeof result === 'string' ? result : '';
 }
 
-function handleFullscreen() {
-  api.resize();
-}
-
+// 👇 核心修改：清除画面时，加上遮罩状态
 function handleClear() {
-  api.clearView();
+  isCleared.value = true; // 显示提示，并覆盖画面
+  void jessibucaApi.clearView();
 }
 
-// 容器尺寸变化时通知 Jessibuca 重新布局
 watch([sizeMode, fixedWidth, fixedHeight, ratio, ratioBaseWidth], () => {
   if (!jessibucaReady.value) return;
-  setTimeout(() => api.resize(), 0);
+  nextTick(() => {
+    setTimeout(() => {
+      jessibucaApi.resize();
+    }, 50);
+  });
 });
 
+// ============================================================
+// 六、生命周期
+// ============================================================
 onMounted(async () => {
   await runFullCheck();
   if (!jessibucaReady.value) startPolling();
-  // onStats 已通过 useJessibucaPlayer options 注册，无需再 setCallbacks
+
+  setTimeout(() => {
+    jessibucaApi.mute();
+  }, 1000);
+
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
 });
 
 onBeforeUnmount(() => {
-  if (checkTimer) {
-    clearInterval(checkTimer);
-    checkTimer = null;
-  }
-  void api.destroy();
+  if (checkTimer) clearInterval(checkTimer);
+  document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  void jessibucaApi.destroy();
 });
 </script>
 
@@ -381,13 +398,9 @@ onBeforeUnmount(() => {
     <Card v-if="!jessibucaReady" class="mb-4" title="vite.config.ts 配置参考">
       <div class="text-sm text-foreground/80">
         在
-        <code class="rounded bg-muted px-1 py-0.5 text-xs">
-          vite.config.ts
-        </code>
+        <code class="rounded bg-muted px-1 py-0.5 text-xs">vite.config.ts</code>
         的
-        <code class="rounded bg-muted px-1 py-0.5 text-xs">
-          application.dependOptions.depends
-        </code>
+        <code class="rounded bg-muted px-1 py-0.5 text-xs">application.dependOptions.depends</code>
         中加入下列配置：
       </div>
       <pre
@@ -400,16 +413,20 @@ onBeforeUnmount(() => {
     </Card>
 
     <template v-if="jessibucaReady">
-      <!-- ===== 播放地址 + 协议识别 ===== -->
+      <!-- ===== 播放地址 ===== -->
       <Card class="mb-4" title="播放地址">
         <ProtocolDetect
           v-model="inputUrl"
           @apply="applyUrl"
           @reset="resetUrl"
         />
-        <div class="mt-2 text-xs text-foreground/50">
-          当前地址：{{ currentUrl || '（空）' }}
+
+        <div class="mt-2 flex flex-wrap items-center gap-3 text-xs">
+          <span class="text-foreground/50">
+            当前地址：{{ currentUrl || '（空）' }}
+          </span>
         </div>
+
         <div v-if="urlHistory.length > 0" class="mt-3">
           <div class="mb-2 text-xs text-foreground/60">最近播放：</div>
           <div class="flex flex-wrap gap-2">
@@ -432,20 +449,40 @@ onBeforeUnmount(() => {
 
       <!-- ===== 播放器 ===== -->
       <Card class="mb-4" title="播放器">
+        <template #extra>
+          <span v-if="player.isLoading.value" class="text-xs text-orange-500">加载中...</span>
+          <span v-else-if="player.error.value" class="text-xs text-red-500">错误：{{ player.error.value }}</span>
+          <span
+            v-else-if="player.isPlaying.value && !isCleared"
+            class="text-xs text-green-500"
+            >播放中</span>
+        </template>
+
         <div class="flex justify-center">
           <div
-            class="overflow-hidden rounded-xl border border-border bg-black"
+            class="overflow-hidden rounded-xl border border-border bg-black relative"
             :style="containerStyle"
           >
             <Player
-              :api="api"
+              :api="jessibucaApi"
               :url="currentUrl"
               :config="config"
               class="h-full w-full"
             />
+
+            <!-- 👇 核心：加上清除后的遮罩提示层 -->
+            <div
+              v-if="isCleared"
+              class="absolute inset-0 bg-black flex items-center justify-center z-10"
+            >
+              <span class="text-foreground/40 text-sm">画面已清除 (流已断开)</span>
+            </div>
           </div>
         </div>
       </Card>
+
+      <!-- ===== 播放状态面板 ===== -->
+      <PlayStatusPanel class="mb-4" :player="player" />
 
       <!-- ===== 画面尺寸 ===== -->
       <Card class="mb-4" title="画面尺寸">
@@ -491,9 +528,9 @@ onBeforeUnmount(() => {
                 fixedHeight = 720;
               }
             "
-          >
-            1280 × 720
-          </Button>
+            >
+1280 × 720
+</Button>
           <Button
             size="small"
             @click="
@@ -502,9 +539,9 @@ onBeforeUnmount(() => {
                 fixedHeight = 1080;
               }
             "
-          >
-            1920 × 1080
-          </Button>
+            >
+1920 × 1080
+</Button>
         </div>
 
         <div
@@ -532,40 +569,49 @@ onBeforeUnmount(() => {
       <Card class="mb-4" title="播放控制">
         <div class="flex flex-wrap items-center gap-3">
           <Button @click="handleToggle">
-            {{ isPlaying ? '暂停' : '播放' }}
+            {{ player.isPlaying.value && !isCleared ? '暂停' : '播放' }}
           </Button>
           <Button @click="handleReload">重新加载</Button>
-          <Button @click="handleFullscreen">适配容器</Button>
+          <Button @click="handleFullscreen">全屏播放</Button>
           <Button @click="handleClear">清除画面</Button>
         </div>
 
-        <div class="mt-4 flex flex-wrap items-center gap-3">
-          <span class="text-sm">静音：</span>
-          <Switch :checked="isMuted" @change="handleMuteChange" />
-          <span class="ml-4 text-sm">音量：</span>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            :value="volume"
-            class="w-40"
-            @input="
-              (e) =>
-                handleVolumeChange(Number((e.target as HTMLInputElement).value))
-            "
-          />
-          <span class="text-xs text-foreground/50">
-            {{ Math.round(volume * 100) }}%
-          </span>
+        <div class="mt-4 flex flex-wrap items-center gap-4">
+          <div class="flex items-center gap-2 whitespace-nowrap">
+            <span class="text-sm">静音：</span>
+            <Switch
+              :checked="player.isMuted.value"
+              @change="handleMuteChange"
+            />
+          </div>
+          <div class="flex items-center gap-2 whitespace-nowrap">
+            <span class="text-sm shrink-0">音量：</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              :value="player.volume.value"
+              class="w-40 shrink-0"
+              @input="
+                (e) =>
+                  handleVolumeChange(
+                    Number((e.target as HTMLInputElement).value),
+                  )
+              "
+            />
+            <span class="text-xs text-foreground/50 w-10 text-right shrink-0">
+              {{ Math.round(player.volume.value * 100) }}%
+            </span>
+          </div>
         </div>
 
         <div class="mt-4 flex flex-wrap items-center gap-3">
-          <span class="text-sm">缩放模式：</span>
+          <span class="text-sm shrink-0">缩放模式：</span>
           <Button
             v-for="mode in [0, 1, 2]"
             :key="mode"
-            :type="scaleMode === mode ? 'primary' : 'default'"
+            :type="player.scaleMode.value === mode ? 'primary' : 'default'"
             size="small"
             @click="handleScaleModeChange(mode as 0 | 1 | 2)"
           >
@@ -579,13 +625,13 @@ onBeforeUnmount(() => {
       <Card class="mb-4" title="网络质量实时曲线">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <NetworkChart
-            :value="currentKbps"
+            :value="(player.stats.value.vbps || 0) / 8 / 1024"
             label="实时码率"
             unit="kB/s"
             color="#22c55e"
           />
           <NetworkChart
-            :value="networkDelay"
+            :value="player.networkDelay.value"
             label="网络延迟 (buf)"
             unit="ms"
             color="#f59e0b"
@@ -594,21 +640,35 @@ onBeforeUnmount(() => {
       </Card>
 
       <!-- ===== 录制面板 ===== -->
-      <RecordPanel
-        class="mb-4"
-        :is-recording="isRecording"
-        :start-record="api.startRecord"
-        :stop-record-and-save="api.stopRecordAndSave"
-      />
+      <template
+        v-if="
+          player.capabilities.record &&
+          player.startRecord &&
+          player.stopRecordAndSave
+        "
+      >
+        <RecordPanel
+          class="mb-4"
+          :is-recording="player.isRecording.value"
+          :recording-duration="player.recordingDuration.value"
+          :start-record="player.startRecord"
+          :stop-record-and-save="player.stopRecordAndSave"
+        />
+      </template>
 
       <!-- ===== 截图预览 ===== -->
-      <ScreenshotPreview class="mb-4" :capture="handleScreenshot" />
+      <template v-if="player.capabilities.screenshot && player.screenshot">
+        <ScreenshotPreview class="mb-4" :capture="handleScreenshot" />
+      </template>
 
       <!-- ===== 多屏对比 ===== -->
       <Card class="mb-4" title="多屏对比">
         <div class="mb-3 flex flex-wrap items-center gap-3">
           <span class="text-sm">启用：</span>
-          <Switch v-model:checked="showMultiScreen" />
+          <Switch
+            :checked="showMultiScreen"
+            @change="(val) => (showMultiScreen = val)"
+          />
           <span class="text-xs text-foreground/50">
             开启后会创建 3 个独立播放器实例（同一路流、三种缩放模式），对
             CPU/带宽有额外压力。
@@ -621,19 +681,6 @@ onBeforeUnmount(() => {
           :height="180"
         />
       </Card>
-
-      <!-- ===== 播放状态 ===== -->
-      <PlayStatusPanel
-        :is-playing="isPlaying"
-        :is-loading="isLoading"
-        :is-recording="isRecording"
-        :is-muted="isMuted"
-        :video-width="videoWidth"
-        :video-height="videoHeight"
-        :network-delay="networkDelay"
-        :error-msg="errorMsg"
-        :scale-mode-label="scaleModeLabel"
-      />
     </template>
   </Page>
 </template>

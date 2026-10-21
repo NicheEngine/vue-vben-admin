@@ -27,7 +27,6 @@ const emit = defineEmits<{
 
 const containerRef = ref<HTMLDivElement>();
 
-/** 是否由组件内部自建 api（决定卸载时是否销毁 api） */
 const ownsApi = !props.api;
 
 const api =
@@ -38,86 +37,64 @@ const api =
   });
 
 /**
- * 合并回调：外部回调（useJessibucaPlayer 传入）先执行，再 emit。
- * 这样既保留外部回调，又能让父组件通过 @play / @error 等监听。
- * 注意：emit 的事件名和外部回调是两套，互不覆盖。
+ * 防御性挂载回调，防止外部传入的 api 没有 setComponentCallbacks 方法（如 Proxy 对象）
  */
-const externalCallbacks = api.getCallbacks();
-
-api.setCallbacks({
-  onPlay: () => {
-    externalCallbacks.onPlay?.();
-    emit('play');
-  },
-  onPause: () => {
-    externalCallbacks.onPause?.();
-    emit('pause');
-  },
-  onError: (err) => {
-    externalCallbacks.onError?.(err);
-    emit('error', err);
-  },
-  onLoad: () => {
-    externalCallbacks.onLoad?.();
-    emit('load');
-  },
-  onVideoInfo: (info) => {
-    externalCallbacks.onVideoInfo?.(info);
-    emit('videoInfo', info);
-  },
-  onStats: (stats) => {
-    externalCallbacks.onStats?.(stats);
-    emit('stats', stats);
-  },
-  onTimeout: (err) => {
-    externalCallbacks.onTimeout?.(err);
-    emit('timeout', err);
-  },
-  onFullscreen: (fs) => {
-    externalCallbacks.onFullscreen?.(fs);
-    emit('fullscreen', fs);
-  },
-  onMute: (m) => {
-    externalCallbacks.onMute?.(m);
-    emit('mute', m);
-  },
-  onRecordStart: () => {
-    externalCallbacks.onRecordStart?.();
-    emit('recordStart');
-  },
-  onRecordEnd: (blob) => {
-    externalCallbacks.onRecordEnd?.(blob);
-    emit('recordEnd', blob);
-  },
-  onRecording: (duration) => {
-    externalCallbacks.onRecording?.(duration);
-    emit('recording', duration);
-  },
-});
+if (typeof api.setComponentCallbacks === 'function') {
+  api.setComponentCallbacks({
+    onPlay: () => emit('play'),
+    onPause: () => emit('pause'),
+    onError: (err) => emit('error', err),
+    onLoad: () => emit('load'),
+    onVideoInfo: (info) => emit('videoInfo', info),
+    onStats: (stats) => emit('stats', stats),
+    onTimeout: (err) => emit('timeout', err),
+    onFullscreen: (fs) => emit('fullscreen', fs),
+    onMute: (m) => emit('mute', m),
+    onRecordStart: () => emit('recordStart'),
+    onRecordEnd: (blob) => emit('recordEnd', blob),
+    onRecording: (duration) => emit('recording', duration),
+  });
+}
 
 let instance: JessibucaInstance | null = null;
 let mounted = false;
 
-/** 创建底层 Jessibuca 实例 */
 async function createInstance() {
   await nextTick();
   if (!containerRef.value || instance) return;
 
+  if (
+    containerRef.value.clientWidth === 0 ||
+    containerRef.value.clientHeight === 0
+  ) {
+    setTimeout(createInstance, 100);
+    return;
+  }
+
   const JessibucaConstructor = (window as any).Jessibuca;
   if (!JessibucaConstructor) {
-    console.error(
-      '[JessibucaPlayer] 未找到 window.Jessibuca，请确保 jessibuca.js 已加载',
-    );
+    console.error('[JessibucaPlayer] 未找到 window.Jessibuca');
     emit('error', new Error('Jessibuca 库未加载'));
     return;
   }
 
-  const resolvedConfig = api.getResolvedConfig();
-  // oxlint-disable-next-line no-console
-  console.log(
-    '[JessibucaPlayer] create instance with config =',
-    resolvedConfig,
-  );
+  // 👇 核心修复：在实例化前，强行唤醒一次 AudioContext，如果被拦截就算了
+  try {
+    const AudioCtx =
+      (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        void ctx.resume();
+      }
+    }
+  } catch {}
+
+  const resolvedConfig = {
+    ...api.getResolvedConfig(),
+    isMute: true,
+    isNotMute: false,
+  };
 
   instance = new JessibucaConstructor({
     container: containerRef.value,
@@ -128,7 +105,6 @@ async function createInstance() {
   api.clearRebuildFlag();
 }
 
-/** 销毁实例 */
 async function destroyInstance() {
   if (!instance) return;
   try {
@@ -138,21 +114,14 @@ async function destroyInstance() {
   }
 }
 
-/** 销毁并重建（config 结构性变化时用） */
 async function rebuildInstance() {
   await destroyInstance();
   await createInstance();
-  // 重建后若之前在播放，恢复播放
   if (api.store.state.url) {
     await api.play();
   }
 }
 
-/**
- * url 变化：同步到 api.store.state.url。
- * 播放一律以 store.url 为准，避免 props.url / state.url 双份数据源。
- * 若正在播放，则用新 url 重播（单一重播入口）。
- */
 watch(
   () => props.url,
   async (url, old) => {
@@ -167,10 +136,6 @@ watch(
   },
 );
 
-/**
- * config 变化：合并到 store。
- * 若 api 标记需要重建（结构性配置变化），销毁重建实例。
- */
 watch(
   () => props.config,
   async (config) => {
@@ -185,24 +150,37 @@ watch(
 
 onMounted(async () => {
   mounted = true;
-  // 首次挂载：把 props 的初始值同步到 store
+
+  // 👇 强行解锁 AudioContext
+  try {
+    const AudioCtx =
+      (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') void ctx.resume();
+    }
+  } catch {}
+
   if (props.url && !api.store.state.url) {
     api.setUrl(props.url);
   }
   if (props.config) {
     api.setConfig(props.config);
   }
+
   await createInstance();
 
-  if (api.store.state.url && api.store.state.config.autoPlay !== false) {
-    await api.play();
-  }
+  // 延迟播放，确保底层 Canvas 渲染完毕
+  setTimeout(async () => {
+    if (api.store.state.url && api.store.state.config.autoPlay !== false) {
+      await api.play();
+    }
+  }, 300);
 });
 
 onBeforeUnmount(async () => {
   mounted = false;
   await destroyInstance();
-  // 只有组件自建的 api 才由组件销毁；外部注入的交给调用方
   if (ownsApi) {
     await api.destroy();
   }

@@ -3,10 +3,7 @@ import { ref } from 'vue';
 
 import { Button, Card, Image } from 'antdv-next';
 
-const props = defineProps<{
-  /** 触发截图的方法，返回 dataURL */
-  capture: () => string | undefined;
-}>();
+const props = defineProps<{ capture: () => string | undefined }>();
 
 const previews = ref<{ url: string; time: string }[]>([]);
 
@@ -32,7 +29,7 @@ function handleCapture() {
 function download(url: string, time: string) {
   const a = document.createElement('a');
   a.href = url;
-  a.download = `jessibuca-${time.replaceAll(':', '-')}.png`;
+  a.download = `screenshot-${time.replaceAll(':', '-')}.png`;
   a.click();
 }
 
