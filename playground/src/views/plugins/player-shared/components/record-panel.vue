@@ -8,6 +8,7 @@ const props = defineProps<{
   recordingDuration: number;
   startRecord: (fileName?: string, fileType?: string) => void;
   stopRecordAndSave: () => void;
+  canRecord?: boolean;
 }>();
 
 const recordStartTime = ref<null | number>(null);
@@ -69,6 +70,7 @@ onBeforeUnmount(() => {
       <Button
         :type="isRecording ? 'primary' : 'default'"
         :danger="isRecording"
+        :disabled="!isRecording && canRecord === false"
         @click="toggle"
       >
         {{ isRecording ? '停止并保存' : '开始录制' }}

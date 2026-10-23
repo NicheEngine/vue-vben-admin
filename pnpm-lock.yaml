@@ -1099,9 +1099,6 @@ importers:
       '@vben-core/shared':
         specifier: workspace:*
         version: link:../../packages/@core/base/shared
-      '@vben-core/typings':
-        specifier: workspace:*
-        version: link:../../packages/@core/base/typings
       hls.js:
         specifier: 'catalog:'
         version: 1.7.3
@@ -1114,12 +1111,9 @@ importers:
 
   external/ossrs-player:
     dependencies:
-      '@vben/types':
+      '@vben-core/shared':
         specifier: workspace:*
-        version: link:../../packages/types
-      '@vben/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
+        version: link:../../packages/@core/base/shared
       vue:
         specifier: 3.5.41
         version: 3.5.41(typescript@6.0.3)
@@ -2176,6 +2170,9 @@ importers:
       '@vben/locales':
         specifier: workspace:*
         version: link:../packages/locales
+      '@vben/ossrs-player':
+        specifier: workspace:*
+        version: link:../external/ossrs-player
       '@vben/plugins':
         specifier: workspace:*
         version: link:../packages/effects/plugins

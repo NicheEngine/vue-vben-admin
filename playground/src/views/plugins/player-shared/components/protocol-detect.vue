@@ -7,7 +7,15 @@ import { Button, Input, Tag } from 'antdv-next';
 
 import { detectProtocol, probeUrl } from '../utils/protocol';
 
-const props = defineProps<{ modelValue: string }>();
+const props = withDefaults(
+  defineProps<{
+    modelValue: string;
+    placeholder?: string; // 👈 新增属性
+  }>(),
+  {
+    placeholder: 'ws://...flv / http://...flv / https://...m3u8', // 默认占位符
+  },
+);
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -63,7 +71,7 @@ function handleReset() {
       <Input
         v-model:value="url"
         class="min-w-[320px] flex-1"
-        placeholder="ws://...flv / http://...flv / https://...m3u8"
+        :placeholder="placeholder"
         allow-clear
         @keydown.enter="handleApply"
       />

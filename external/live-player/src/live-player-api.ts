@@ -35,10 +35,16 @@ function cloneDefaultMpegtsOptions() {
 export class LivePlayerApi {
   public store: Store<LivePlayerStoreState>;
 
+  /** 暴露 video 元素，供 adapter 读取尺寸/时间 */
+  public get video(): HTMLVideoElement | null {
+    return this.videoElement;
+  }
   private componentCallbacks: LivePlayerApiOptions = {};
   private prevState: LivePlayerStoreState;
   private subscribe: Subscription;
   private userCallbacks: LivePlayerApiOptions = {};
+
+  private videoElement: HTMLVideoElement | null = null;
 
   constructor(options: LivePlayerApiOptions = {}) {
     const {
@@ -127,8 +133,14 @@ export class LivePlayerApi {
     bindMethods(this);
   }
 
+  /** 绑定底层 video 元素，供 play/pause 直接操作 */
+  public bindVideoElement(el: HTMLVideoElement | null) {
+    this.videoElement = el;
+  }
+
   destroy() {
     this.subscribe?.unsubscribe();
+    this.videoElement = null;
   }
 
   public getCallbacks(): Readonly<LivePlayerApiOptions> {
@@ -137,10 +149,12 @@ export class LivePlayerApi {
 
   pause() {
     this.store.setState((prev) => ({ ...prev, isPlaying: false }));
+    this.videoElement?.pause();
   }
 
   play() {
     this.store.setState((prev) => ({ ...prev, isPlaying: true }));
+    this.videoElement?.play().catch(() => {});
   }
 
   seek(time: number) {

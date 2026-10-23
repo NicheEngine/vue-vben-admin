@@ -41,6 +41,8 @@ export interface IPlayerApi {
   // ===== 能力声明 =====
   capabilities: PlayerCapabilities;
   setLoading?: (loading: boolean) => void;
+  updatePlaying?: (playing: boolean) => void;
+  updateLoading?: (loading: boolean) => void;
   // ===== 基础控制 =====
   play: () => Promise<void>;
   pause: () => Promise<void>;

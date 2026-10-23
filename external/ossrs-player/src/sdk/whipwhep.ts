@@ -42,23 +42,10 @@ class SrsRtcWhipWhepAsyncImpl implements SrsRtcWhipWhep {
     }
     const pc = this.ensurePc();
 
-    // 同时加 audio + video，避免丢音频
-    pc.addTransceiver('audio', { direction: 'recvonly' });
+    // 严格对齐官方 SDK：WHEP 默认只拉取 video
     pc.addTransceiver('video', { direction: 'recvonly' });
 
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    const offerSdp = getSdpOrThrow(offer);
-
-    const answer = await postSDPPlain(url, offerSdp);
-    await pc.setRemoteDescription(
-      new RTCSessionDescription({ type: 'answer', sdp: answer }),
-    );
-
-    const sessionid = extractWhipSessionId(offerSdp, answer);
-    const a = document.createElement('a');
-    a.href = url;
-    return { sessionid, simulator: `${a.protocol}//${a.host}/rtc/v1/nack/` };
+    return this.negotiateWhipWhep(url, pc);
   }
 
   async publish(url: string): Promise<SessionInfo> {
@@ -78,14 +65,41 @@ class SrsRtcWhipWhepAsyncImpl implements SrsRtcWhipWhep {
       );
     }
 
+    pc.getSenders().forEach((s) => {
+      if (s.track) s.replaceTrack(null);
+    });
+
     const mediaStream = await navigator.mediaDevices.getUserMedia(
       this.constraints,
     );
     this.stream = mediaStream;
 
-    // 只 addTrack，让浏览器自动创建 sendonly transceiver
     mediaStream.getTracks().forEach((track) => pc.addTrack(track, mediaStream));
 
+    return this.negotiateWhipWhep(url, pc);
+  }
+
+  private ensurePc(): RTCPeerConnection {
+    if (!this.pc) {
+      this.pc = new RTCPeerConnection();
+
+      this.pc.ontrack = (event) => {
+        if (!this.stream.getTracks().includes(event.track)) {
+          this.stream.addTrack(event.track);
+        }
+        this.ontrack?.(event);
+      };
+    }
+    return this.pc;
+  }
+
+  /**
+   * 提取公共的 WHIP/WHEP 协商逻辑
+   */
+  private async negotiateWhipWhep(
+    url: string,
+    pc: RTCPeerConnection,
+  ): Promise<SessionInfo> {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     const offerSdp = getSdpOrThrow(offer);
@@ -98,15 +112,8 @@ class SrsRtcWhipWhepAsyncImpl implements SrsRtcWhipWhep {
     const sessionid = extractWhipSessionId(offerSdp, answer);
     const a = document.createElement('a');
     a.href = url;
-    return { sessionid, simulator: `${a.protocol}//${a.host}/rtc/v1/nack/` };
-  }
 
-  private ensurePc(): RTCPeerConnection {
-    if (!this.pc) {
-      this.pc = new RTCPeerConnection();
-      this.pc.ontrack = (event) => this.ontrack?.(event);
-    }
-    return this.pc;
+    return { sessionid, simulator: `${a.protocol}//${a.host}/rtc/v1/nack/` };
   }
 }
 

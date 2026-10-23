@@ -417,6 +417,7 @@ onBeforeUnmount(() => {
       <Card class="mb-4" title="播放地址">
         <ProtocolDetect
           v-model="inputUrl"
+          placeholder="ws://...flv / http://...flv"
           @apply="applyUrl"
           @reset="resetUrl"
         />
@@ -528,9 +529,9 @@ onBeforeUnmount(() => {
                 fixedHeight = 720;
               }
             "
-            >
-1280 × 720
-</Button>
+          >
+            1280 × 720
+          </Button>
           <Button
             size="small"
             @click="
@@ -539,9 +540,9 @@ onBeforeUnmount(() => {
                 fixedHeight = 1080;
               }
             "
-            >
-1920 × 1080
-</Button>
+          >
+            1920 × 1080
+          </Button>
         </div>
 
         <div
@@ -653,6 +654,7 @@ onBeforeUnmount(() => {
           :recording-duration="player.recordingDuration.value"
           :start-record="player.startRecord"
           :stop-record-and-save="player.stopRecordAndSave"
+          :can-record="player.isPlaying.value"
         />
       </template>
 

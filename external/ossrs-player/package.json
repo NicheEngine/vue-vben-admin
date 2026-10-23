@@ -17,8 +17,7 @@
     }
   },
   "dependencies": {
-    "@vben/types": "workspace:*",
-    "@vben/utils": "workspace:*",
+    "@vben-core/shared": "workspace:*",
     "vue": "catalog:"
   }
 }

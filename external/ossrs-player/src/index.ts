@@ -1,27 +1,6 @@
-import { SrsError } from './errors';
-import { SrsRtcFormatSenders } from './formatter';
-import { SrsRtcPlayerAsync } from './player';
-import { SrsRtcPublisherAsync } from './publisher';
-import { SrsRtcWhipWhepAsync } from './whipwhep';
-
-export {
-  SrsError,
-  SrsRtcFormatSenders,
-  SrsRtcPlayerAsync,
-  SrsRtcPublisherAsync,
-  SrsRtcWhipWhepAsync,
-};
+export { OssrsPlayerApi } from './ossrs-player-api';
 
 export { default as OssrsPlayer } from './ossrs-player.vue';
-export { type SrsRtcPlayer } from './player';
-export { type SrsRtcPublisher } from './publisher';
-export * from './types';
-export { type SrsRtcWhipWhep } from './whipwhep';
-
-export default {
-  SrsError,
-  SrsRtcPublisherAsync,
-  SrsRtcPlayerAsync,
-  SrsRtcWhipWhepAsync,
-  SrsRtcFormatSenders,
-};
+export * from './sdk';
+export type * from './types';
+export { useOssrsPlayer } from './use-ossrs-player';

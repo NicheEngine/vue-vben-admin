@@ -1,5 +1,6 @@
 export { createJessibucaAdapter } from './adapters/jessibuca-adapter';
 export { createLiveAdapter } from './adapters/live-adapter';
+export { createOssrsAdapter } from './adapters/ossrs-adapter';
 export { default as NetworkChart } from './components/network-chart.vue';
 export { default as PlayStatusPanel } from './components/play-status-panel.vue';
 export { default as ProtocolDetect } from './components/protocol-detect.vue';

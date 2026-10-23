@@ -6,6 +6,8 @@ export type StreamProtocol =
   | 'http-flv'
   | 'https-flv'
   | 'unknown'
+  | 'webrtc'
+  | 'whep'
   | 'ws-flv'
   | 'wss-flv';
 
@@ -18,6 +20,26 @@ export interface ProtocolInfo {
 
 export function detectProtocol(url: string): ProtocolInfo {
   const lower = url.trim().toLowerCase();
+
+  // 识别 WHEP
+  if (lower.includes('/whep/') || lower.includes('/whip-play/')) {
+    return {
+      protocol: 'whep',
+      label: 'WHEP',
+      color: 'blue',
+      description: '标准 WebRTC 协议，需服务器支持 WHIP/WHEP',
+    };
+  }
+
+  // 识别 SRS RTC (支持 webrtc:// 和 rtc://)
+  if (lower.startsWith('webrtc://') || lower.startsWith('rtc://')) {
+    return {
+      protocol: 'webrtc',
+      label: 'SRS RTC',
+      color: 'green',
+      description: '超低延迟 WebRTC，需 SRS 服务器支持',
+    };
+  }
 
   if (lower.startsWith('ws://')) {
     return {
@@ -89,6 +111,24 @@ export interface ProbeResult {
  */
 export async function probeUrl(url: string): Promise<ProbeResult> {
   const protocol = detectProtocol(url).protocol;
+
+  // 👇 核心修复：WebRTC 和 WHEP 协议不能使用 GET 探测（不支持 fetch），直接返回可访问
+  if (
+    protocol === 'webrtc' ||
+    protocol === 'whep' ||
+    url.startsWith('webrtc://') ||
+    url.startsWith('rtc://') ||
+    url.includes('/whep/') ||
+    url.includes('/whip-play/')
+  ) {
+    return {
+      ok: true,
+      status: 200,
+      contentType: 'application/sdp',
+      error: '',
+    };
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
 

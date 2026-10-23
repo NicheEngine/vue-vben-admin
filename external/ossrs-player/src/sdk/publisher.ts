@@ -31,7 +31,6 @@ class SrsRtcPublisherAsyncImpl implements SrsRtcPublisher {
   async publish(url: string): Promise<SessionInfo> {
     const pc = this.ensurePc();
 
-    // prepareUrl 只调用一次
     const { apiUrl, streamUrl, tid, schema, urlObject, port } = prepareUrl(
       url,
       '/rtc/v1/publish/',
@@ -47,6 +46,11 @@ class SrsRtcPublisherAsyncImpl implements SrsRtcPublisher {
         'Please use HTTPS or localhost to publish, see https://github.com/ossrs/srs/issues/2762#issuecomment-983147576',
       );
     }
+
+    // 清理残留 sender，避免 pc 复用时叠加
+    pc.getSenders().forEach((s) => {
+      if (s.track) s.replaceTrack(null);
+    });
 
     const mediaStream = await navigator.mediaDevices.getUserMedia(
       this.constraints,

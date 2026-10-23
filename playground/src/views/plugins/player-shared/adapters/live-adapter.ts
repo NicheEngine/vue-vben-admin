@@ -5,26 +5,27 @@ import type { IPlayerApi, PlayerStats } from '../types';
 import { ref } from 'vue';
 
 export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
-  const isPlaying = ref<boolean>(api.store.state.isPlaying ?? false);
-  const isLoading = ref<boolean>(api.store.state.isLoading ?? false);
-  const isReady = ref<boolean>(api.store.state.isReady ?? false);
+  const isPlaying = ref(api.store.state.isPlaying ?? false);
+  const isLoading = ref(api.store.state.isLoading ?? false);
+  const isReady = ref(api.store.state.isReady ?? false);
   const error = ref<null | string>(api.store.state.error ?? null);
-  const volume = ref<number>(api.store.state.volume ?? 1);
-  const isMuted = ref<boolean>(api.store.state.muted ?? false);
-  const currentTime = ref<number>(api.store.state.currentTime ?? 0);
+  const volume = ref(api.store.state.volume ?? 1);
+  const isMuted = ref(api.store.state.muted ?? false);
+  const currentTime = ref(api.store.state.currentTime ?? 0);
+  const videoWidth = ref(api.store.state.videoWidth ?? 0);
+  const videoHeight = ref(api.store.state.videoHeight ?? 0);
+  const networkDelay = ref(api.store.state.networkDelay ?? 0);
+  const stats = ref<PlayerStats>(api.store.state.stats ?? {});
 
-  const videoWidth = ref<number>((api.store.state as any).videoWidth ?? 0);
-  const videoHeight = ref<number>((api.store.state as any).videoHeight ?? 0);
-  const networkDelay = ref<number>((api.store.state as any).networkDelay ?? 0);
-  const stats = ref<PlayerStats>((api.store.state as any).stats ?? {});
-
+  const scaleMode = ref<0 | 1 | 2>(1);
   const isRecording = ref<boolean>(false);
   const recordingDuration = ref<number>(0);
+
   let mediaRecorder: MediaRecorder | null = null;
   let recordedChunks: Blob[] = [];
   let recordTimer: null | ReturnType<typeof setInterval> = null;
 
-  api.store.subscribe((state) => {
+  const unsub = api.store.subscribe((state) => {
     isPlaying.value = state.isPlaying ?? false;
     isLoading.value = state.isLoading ?? false;
     isReady.value = state.isReady ?? false;
@@ -32,16 +33,13 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     volume.value = state.volume ?? 1;
     isMuted.value = state.muted ?? false;
     currentTime.value = state.currentTime ?? 0;
-
-    videoWidth.value = (state as any).videoWidth ?? 0;
-    videoHeight.value = (state as any).videoHeight ?? 0;
-    networkDelay.value = (state as any).networkDelay ?? 0;
-    if ((state as any).stats) stats.value = (state as any).stats;
+    videoWidth.value = state.videoWidth ?? 0;
+    videoHeight.value = state.videoHeight ?? 0;
+    networkDelay.value = state.networkDelay ?? 0;
+    stats.value = state.stats ?? {};
   });
 
-  const getVideoElement = (): HTMLVideoElement | null => {
-    return (api as any).videoRef?.value || document.querySelector('video');
-  };
+  const getVideo = (): HTMLVideoElement | null => api.video;
 
   return {
     isPlaying,
@@ -54,16 +52,15 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     videoHeight,
     currentTime,
     networkDelay,
-
     isRecording,
     recordingDuration,
-    scaleMode: ref<0 | 1 | 2>(1),
+    scaleMode,
     stats,
 
     capabilities: {
       screenshot: true,
       record: true,
-      scaleMode: true, // 改为 true
+      scaleMode: true,
       stats: true,
       seek: false,
       fullscreen: true,
@@ -75,14 +72,31 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     setVolume: (v) => api.setVolume(v),
     setMuted: (m) => api.setMuted(m),
     setUrl: (u) => api.setUrl(u),
-    seek: (t) => api.seek(t),
+
     destroy: async () => {
-      if (recordTimer) clearInterval(recordTimer);
+      unsub.unsubscribe();
+      if (recordTimer) {
+        clearInterval(recordTimer);
+        recordTimer = null;
+      }
       api.destroy();
     },
 
+    setScaleMode: (mode: 0 | 1 | 2) => {
+      scaleMode.value = mode;
+      const video = getVideo();
+      if (video) {
+        const fitMap: Record<0 | 1 | 2, string> = {
+          0: 'fill',
+          1: 'contain',
+          2: 'cover',
+        };
+        video.style.objectFit = fitMap[mode];
+      }
+    },
+
     screenshot: (opts) => {
-      const video = getVideoElement();
+      const video = getVideo();
       if (!video) return undefined;
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth || 1280;
@@ -94,12 +108,10 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     },
 
     startRecord: () => {
-      const video = getVideoElement();
+      const video = getVideo();
       if (!video) return;
-
       const stream = (video as any).captureStream?.() as MediaStream;
       if (!stream) return;
-
       mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
       recordedChunks = [];
       mediaRecorder.ondataavailable = (e) => {
@@ -115,7 +127,6 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
         URL.revokeObjectURL(url);
       };
       mediaRecorder.start();
-
       isRecording.value = true;
       recordingDuration.value = 0;
       recordTimer = setInterval(() => {
@@ -127,25 +138,11 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
         isRecording.value = false;
-        if (recordTimer) clearInterval(recordTimer);
+        if (recordTimer) {
+          clearInterval(recordTimer);
+          recordTimer = null;
+        }
       }
-    },
-
-    setScaleMode: (mode: 0 | 1 | 2) => {
-      const video = getVideoElement();
-      if (video) {
-        // 用 CSS object-fit 模拟缩放
-        if (mode === 0)
-          video.style.objectFit = 'fill'; // 拉伸
-        else if (mode === 1)
-          video.style.objectFit = 'contain'; // 等比留黑边
-        else if (mode === 2) video.style.objectFit = 'cover'; // 等比裁切
-      }
-      // 同时更新 api store 里的状态
-      (api.store as any).setState((prev: any) => ({
-        ...prev,
-        scaleMode: mode,
-      }));
     },
   };
 }

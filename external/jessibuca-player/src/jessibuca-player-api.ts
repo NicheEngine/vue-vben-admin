@@ -408,10 +408,23 @@ export class JessibucaPlayerApi {
   }
 
   startRecord(fileName?: string, fileType?: string) {
-    this.instance?.startRecord(fileName, fileType);
+    if (!this.instance) {
+      const msg = '播放器尚未初始化，无法录制';
+      this.setError(msg);
+      throw new Error(msg);
+    }
+
+    if (!this.store.state.isPlaying) {
+      const msg = '请先播放视频后再开始录制';
+      this.setError(msg);
+      throw new Error(msg);
+    }
+    this.instance.startRecord(fileName, fileType);
   }
 
   stopRecordAndSave() {
+    if (!this.instance) return;
+    if (!this.store.state.isRecording) return;
     this.instance?.stopRecordAndSave();
   }
 

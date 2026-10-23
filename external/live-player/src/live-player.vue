@@ -39,7 +39,6 @@ const emit = defineEmits<LivePlayerEmits>();
 const videoRef = ref<HTMLVideoElement>();
 let hlsPlayer: Hls | null = null;
 let mpegtsPlayer: Mpegts.Player | null = null;
-
 let sessionId = 0;
 
 const ownsApi = !props.livePlayerApi;
@@ -129,7 +128,6 @@ function loadHls(resource: string, sid: number) {
     }
   });
 
-  // HLS 统计数据
   let hlsTimer = setInterval(() => {
     if (sid === sessionId && isApiMode && hlsPlayer) {
       const vbps = (hlsPlayer as any).bandwidthEstimate || 0;
@@ -160,18 +158,13 @@ function loadMpegts(resource: string, sid: number) {
 
   const opts = mpegtsOptions.value || {};
 
-  // 👇 终极极简配置：关闭所有自动追帧和同步，防止内部死锁
   const mergedConfig = {
-    enableStashBuffer: false, // 关闭缓存池，来了就播
-    autoCleanupSourceBuffer: true, // 自动清理旧数据，防止内存溢出
-    // 关键：彻底关闭 liveSync 及其相关参数
+    enableStashBuffer: false,
+    autoCleanupSourceBuffer: true,
     liveSync: false,
-    // 关闭懒加载和延迟加载，强制立即解析
     lazyLoad: false,
     deferLoadAfterSourceOpen: false,
-    // 关闭音频时间戳修复，避免生成静音帧干扰
     fixAudioTimestampGap: false,
-    // 移除 startupStallDuration，让 mpegts 使用默认行为（或者设为 0 彻底关闭检测）
     ...opts.config,
   };
 
@@ -187,24 +180,18 @@ function loadMpegts(resource: string, sid: number) {
 
   mpegtsPlayer = player;
 
-  // 监听 MediaInfo，拿到元数据后立刻播放
   player.on(Mpegts.Events.MEDIA_INFO, () => {
     if (sid !== sessionId) return;
     if (autoplay.value) {
-      // 稍微延迟一点点，确保 MSE 的 SourceBuffer 处于 open 状态
       setTimeout(() => {
-        if (mpegtsPlayer) {
-          mpegtsPlayer.play();
-        }
+        if (mpegtsPlayer) mpegtsPlayer.play();
       }, 100);
     }
   });
 
-  // 监听错误，如果是严重错误则自动重试
   player.on(Mpegts.Events.ERROR, (errorType, errorDetail) => {
     if (sid !== sessionId) return;
     console.warn('[Mpegts] Playback error:', errorType, errorDetail);
-    // 如果是网络或媒体错误，尝试重新加载
     if (
       errorType === Mpegts.ErrorTypes.NETWORK_ERROR ||
       errorType === Mpegts.ErrorTypes.MEDIA_ERROR
@@ -215,7 +202,6 @@ function loadMpegts(resource: string, sid: number) {
     }
   });
 
-  // 统计信息（保留你的码率计算）
   player.on(Mpegts.Events.STATISTICS_INFO, (info: any) => {
     if (sid !== sessionId || !isApiMode) return;
     const vbps = (info.speed || 0) * 1024;
@@ -258,10 +244,10 @@ function refresh() {
   destroyLivePlayer();
   setLoading(true);
   setError(null);
+  if (isApiMode) api.updateReady(false);
 
-  // 👇 修复 ESLint 报错
   const lowerUrl = targetUrl.toLowerCase();
-  let useHls: boolean; // 移除 = false 的初始赋值
+  let useHls: boolean;
 
   if (lowerUrl.includes('.m3u8')) {
     useHls = true;
@@ -275,11 +261,9 @@ function refresh() {
   else loadMpegts(targetUrl, sid);
 }
 
-// 暂停防抖：防止 @play 事件意外触发导致 UI 闪烁
 let lastPauseTime = 0;
 
 function onPlay() {
-  // 如果刚刚才触发了 pause，忽略这个 play 事件
   if (Date.now() - lastPauseTime < 300) return;
   if (isApiMode) api.updatePlaying(true);
 }
@@ -299,6 +283,7 @@ function onVolumeChange() {
 }
 function onCanPlay() {
   setLoading(false);
+  if (isApiMode) api.updateReady(true);
 }
 
 watch(url, (n, o) => {
@@ -325,13 +310,17 @@ if (isApiMode) {
 
 onMounted(async () => {
   await nextTick();
-  if (videoRef.value) videoRef.value.muted = muted.value;
+  if (videoRef.value) {
+    videoRef.value.muted = muted.value;
+    api.bindVideoElement(videoRef.value); // ← 绑定
+  }
   if (url.value) refresh();
 });
 
 onBeforeUnmount(() => {
   sessionId++;
   destroyLivePlayer();
+  api.bindVideoElement(null); // ← 解绑
   if (ownsApi) api.destroy();
 });
 

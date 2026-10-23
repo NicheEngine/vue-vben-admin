@@ -18,7 +18,6 @@
   },
   "dependencies": {
     "@vben-core/shared": "workspace:*",
-    "@vben-core/typings": "workspace:*",
     "hls.js": "catalog:",
     "mpegts.js": "catalog:",
     "vue": "catalog:"

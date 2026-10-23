@@ -44,7 +44,6 @@ export function parseUrl(url: string): UrlParseResult {
     .replace('rtc://', 'http://');
 
   let vhost: string = a.hostname;
-  // substring -> slice
   let app = a.pathname.slice(1, a.pathname.lastIndexOf('/'));
   const stream = a.pathname.slice(a.pathname.lastIndexOf('/') + 1);
 
@@ -92,7 +91,6 @@ export function parseUrl(url: string): UrlParseResult {
   };
   fillQuery(a.search, result);
 
-  // 合并 lonely-if：外层 if 加 else 分支，或把内层条件提到外层
   if (!result.port && (schema === 'webrtc' || schema === 'rtc')) {
     if (result.user_query.schema === 'https') {
       result.port = 443;
@@ -124,7 +122,6 @@ export function prepareUrl(
   let apiUrl = `${schema}//${urlObject.server}:${port}${api}`;
   for (const [key, value] of Object.entries(urlObject.user_query)) {
     if (key !== 'api' && key !== 'play') {
-      // 用模板字符串替代 += 拼接
       apiUrl = `${apiUrl}&${key}=${value}`;
     }
   }
@@ -138,34 +135,57 @@ export function prepareUrl(
 
 /** 发送 SDP 请求（JSON 格式） */
 export function postSDPJson(url: string, data: unknown): Promise<SessionInfo> {
+  console.warn('[SrsSdk][Debug] 发起 postSDPJson 请求:', url);
+
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    const timer = setTimeout(() => {
+      console.warn('[SrsSdk][Debug] XHR 请求超时 (8s)');
+      xhr.abort();
+      reject(new SrsError('TimeoutError', 'SDP request timeout (8s)'));
+    }, 8000);
+
+    const done = (fn: () => void) => {
+      clearTimeout(timer);
+      fn();
+    };
 
     xhr.addEventListener('load', () => {
-      if (xhr.readyState !== XMLHttpRequest.DONE) return;
-      if (xhr.status !== 200 && xhr.status !== 201) {
-        reject(new SrsError('HttpError', `HTTP ${xhr.status}`));
-        return;
-      }
-      try {
-        const json = JSON.parse(xhr.responseText);
-        const code = json.code;
-        if (code && code !== 0 && code !== '0') {
-          reject(new SrsError('ApiError', String(code)));
-        } else {
-          resolve(json);
+      done(() => {
+        console.warn('[SrsSdk][Debug] XHR 请求返回, status:', xhr.status);
+        if (xhr.readyState !== XMLHttpRequest.DONE) return;
+        if (xhr.status !== 200 && xhr.status !== 201) {
+          reject(new SrsError('HttpError', `HTTP ${xhr.status}`));
+          return;
         }
-      } catch (error) {
-        reject(error);
-      }
+        try {
+          const json = JSON.parse(xhr.responseText);
+          const code = json.code;
+          if (code && code !== 0 && code !== '0') {
+            reject(new SrsError('ApiError', String(code)));
+          } else {
+            resolve(json);
+          }
+        } catch (error) {
+          console.error('[SrsSdk][Debug] 解析 JSON 失败:', error);
+          reject(error);
+        }
+      });
     });
 
     xhr.addEventListener('error', () => {
-      reject(new SrsError('NetworkError', 'Request failed'));
+      console.error('[SrsSdk][Debug] XHR 请求发生 error');
+      done(() => reject(new SrsError('NetworkError', 'Request failed')));
+    });
+
+    xhr.addEventListener('abort', () => {
+      console.warn('[SrsSdk][Debug] XHR 请求被 abort');
+      done(() => reject(new SrsError('AbortError', 'Request aborted')));
     });
 
     xhr.open('POST', url, true);
     xhr.setRequestHeader('Content-type', 'application/json');
+    console.warn('[SrsSdk][Debug] 执行 xhr.send, 数据准备完毕');
     xhr.send(JSON.stringify(data));
   });
 }
@@ -174,18 +194,33 @@ export function postSDPJson(url: string, data: unknown): Promise<SessionInfo> {
 export function postSDPPlain(url: string, sdp: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    const timer = setTimeout(() => {
+      xhr.abort();
+      reject(new SrsError('TimeoutError', 'SDP request timeout (8s)'));
+    }, 8000);
+
+    const done = (fn: () => void) => {
+      clearTimeout(timer);
+      fn();
+    };
 
     xhr.addEventListener('load', () => {
-      if (xhr.readyState !== XMLHttpRequest.DONE) return;
-      if (xhr.status !== 200 && xhr.status !== 201) {
-        reject(new SrsError('HttpError', `HTTP ${xhr.status}`));
-      } else {
-        resolve(xhr.responseText);
-      }
+      done(() => {
+        if (xhr.readyState !== XMLHttpRequest.DONE) return;
+        if (xhr.status !== 200 && xhr.status !== 201) {
+          reject(new SrsError('HttpError', `HTTP ${xhr.status}`));
+        } else {
+          resolve(xhr.responseText);
+        }
+      });
     });
 
     xhr.addEventListener('error', () => {
-      reject(new SrsError('NetworkError', 'Request failed'));
+      done(() => reject(new SrsError('NetworkError', 'Request failed')));
+    });
+
+    xhr.addEventListener('abort', () => {
+      done(() => reject(new SrsError('AbortError', 'Request aborted')));
     });
 
     xhr.open('POST', url, true);
