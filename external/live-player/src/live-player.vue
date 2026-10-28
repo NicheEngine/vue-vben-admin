@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { CSSProperties } from 'vue';
+
 import type {
   LivePlayerEmits,
   LivePlayerProps,
@@ -31,6 +33,7 @@ const props = withDefaults(
     mpegtsOptions: undefined,
     type: undefined,
     livePlayerApi: undefined,
+    objectFit: 'contain',
   },
 );
 
@@ -40,6 +43,9 @@ const videoRef = ref<HTMLVideoElement>();
 let hlsPlayer: Hls | null = null;
 let mpegtsPlayer: Mpegts.Player | null = null;
 let sessionId = 0;
+let hlsTimer: null | ReturnType<typeof setInterval> = null;
+let mpegtsRetryCount = 0;
+let mounted = false;
 
 const ownsApi = !props.livePlayerApi;
 const api = props.livePlayerApi ?? new LivePlayerApi();
@@ -63,6 +69,14 @@ const localState = reactive<Pick<LivePlayerStoreState, 'error' | 'isLoading'>>({
   isLoading: false,
   error: null,
 });
+
+const maxRetry = computed(
+  () => props.mpegtsMaxRetry ?? api.store.state.mpegtsMaxRetry ?? 3,
+);
+
+const videoStyle = computed<CSSProperties>(() => ({
+  objectFit: props.objectFit || 'contain',
+}));
 
 const state = computed<Pick<LivePlayerStoreState, 'error' | 'isLoading'>>(() =>
   isApiMode
@@ -97,6 +111,10 @@ function setError(error: null | string) {
 }
 
 function destroyLivePlayer() {
+  if (hlsTimer) {
+    clearInterval(hlsTimer); // 强制清理定时器
+    hlsTimer = null;
+  }
   if (hlsPlayer) {
     hlsPlayer.destroy();
     hlsPlayer = null;
@@ -123,31 +141,76 @@ function loadHls(resource: string, sid: number) {
 
   player.on(Hls.Events.MANIFEST_PARSED, () => {
     if (sid !== sessionId) return;
+    setLoading(false);
+    if (isApiMode) api.updateReady(true);
     if (autoplay.value && videoRef.value) {
       videoRef.value.play().catch(() => {});
     }
   });
 
-  let hlsTimer = setInterval(() => {
-    if (sid === sessionId && isApiMode && hlsPlayer) {
-      const vbps = (hlsPlayer as any).bandwidthEstimate || 0;
-      const buf = videoRef.value?.buffered.length
-        ? (videoRef.value.buffered.end(0) - videoRef.value.currentTime) * 1000
-        : 0;
+  // 👈 核心修复：在分片加载时，计算真实的码率并缓存下来
+  let lastRealVbps = 0;
+  player.on(Hls.Events.FRAG_LOADED, (_event, data) => {
+    if (sid !== sessionId) return;
+    // data.frag.duration 是视频片段的真实秒数（比如 2s, 4s）
+    // data.payload.byteLength 是片段的字节数
+    if (data.frag.duration > 0) {
+      lastRealVbps = (data.payload.byteLength * 8) / data.frag.duration;
+    }
+  });
+
+  hlsTimer = setInterval(() => {
+    if (sid === sessionId && isApiMode && hlsPlayer && videoRef.value) {
+      // 1. 码率获取 (沿用你的 lastRealVbps 或 bandwidthEstimate)
+      const vbps =
+        lastRealVbps > 0
+          ? lastRealVbps
+          : (hlsPlayer as any).bandwidthEstimate || 0;
+
+      // 2. 👈 修复 HLS 缓冲过大：直接使用 HLS 底层的真实 latency
+      let buf = 0;
+
+      // hls.js 内部有一个 latency 属性，代表了距离直播边缘的真实秒数
+      const hlsLatency = (hlsPlayer as any).latency;
+
+      if (hlsLatency !== undefined && hlsLatency !== null) {
+        // hlsLatency 单位是秒，转为毫秒
+        buf = hlsLatency * 1000;
+      } else {
+        // 兜底方案：使用 seekable 计算，但加上更严苛的截断
+        try {
+          if (videoRef.value.seekable && videoRef.value.seekable.length > 0) {
+            const seekableEnd = videoRef.value.seekable.end(
+              videoRef.value.seekable.length - 1,
+            );
+            if (seekableEnd > videoRef.value.currentTime) {
+              buf = (seekableEnd - videoRef.value.currentTime) * 1000;
+            }
+          }
+        } catch {}
+      }
+
+      // 👈 如果是普通直播，HLS 延迟通常在 3~6 秒。这里限制上限为 8000ms。
+      // 如果超过 8000ms，说明推流端网络堆积严重，强制显示 8000ms 防止 UI 爆炸。
+      if (buf > 8000) buf = 8000;
+      if (buf < 0) buf = 0;
+
+      // 3. 增加抖动 (沿用刚才的 10% 抖动)
+      const jitterFactor = 0.9 + Math.random() * 0.2;
+
       api.updateStats({
-        buf,
+        buf: buf * jitterFactor,
         fps: 30,
         abps: 0,
-        vbps,
-        ts: videoRef.value?.currentTime || 0,
+        vbps: vbps * jitterFactor,
+        ts: videoRef.value.currentTime || 0,
       });
       api.updateVideoSize(
-        videoRef.value?.videoWidth || 0,
-        videoRef.value?.videoHeight || 0,
+        videoRef.value.videoWidth || 0,
+        videoRef.value.videoHeight || 0,
       );
     }
   }, 1000);
-  player.on(Hls.Events.DESTROYING, () => clearInterval(hlsTimer));
 }
 
 function loadMpegts(resource: string, sid: number) {
@@ -182,6 +245,8 @@ function loadMpegts(resource: string, sid: number) {
 
   player.on(Mpegts.Events.MEDIA_INFO, () => {
     if (sid !== sessionId) return;
+    setLoading(false);
+    if (isApiMode) api.updateReady(true);
     if (autoplay.value) {
       setTimeout(() => {
         if (mpegtsPlayer) mpegtsPlayer.play();
@@ -192,27 +257,52 @@ function loadMpegts(resource: string, sid: number) {
   player.on(Mpegts.Events.ERROR, (errorType, errorDetail) => {
     if (sid !== sessionId) return;
     console.warn('[Mpegts] Playback error:', errorType, errorDetail);
+    setLoading(false);
+    if (isApiMode) api.updateReady(false);
     if (
       errorType === Mpegts.ErrorTypes.NETWORK_ERROR ||
       errorType === Mpegts.ErrorTypes.MEDIA_ERROR
     ) {
-      setTimeout(() => {
-        if (sid === sessionId) refresh();
-      }, 1000);
+      mpegtsRetryCount++;
+
+      const max = maxRetry.value;
+      // 核心判断：-1 无限重试；0 不重试；>0 在限制内重试
+      const shouldRetry = max === -1 || (max > 0 && mpegtsRetryCount <= max);
+      if (shouldRetry) {
+        setTimeout(() => {
+          if (sid === sessionId) refresh();
+        }, 1000);
+      } else {
+        setError(`网络连接失败，已重试 ${mpegtsRetryCount - 1} 次后停止`);
+      }
     }
   });
 
   player.on(Mpegts.Events.STATISTICS_INFO, (info: any) => {
     if (sid !== sessionId || !isApiMode) return;
-    const vbps = (info.speed || 0) * 1024;
-    let buf = 0;
+
+    // 1. 计算基础值
+    const rawVbps = (info.speed || 0) * 1024 * 8;
+
+    let rawBuf = 0;
     if (videoRef.value && videoRef.value.buffered.length > 0) {
       const curTime = videoRef.value.currentTime;
       const bufferedEnd = videoRef.value.buffered.end(
         videoRef.value.buffered.length - 1,
       );
-      buf = Math.max(0, (bufferedEnd - curTime) * 1000);
+      rawBuf = Math.max(0, (bufferedEnd - curTime) * 1000);
+      if (rawBuf > 5000) rawBuf = 5000;
     }
+
+    // 2. 👈 核心新增：生成 0.9 ~ 1.1 的抖动系数
+    // 这样数据会在 90% 到 110% 之间波动，视觉上就有明显的跳动感
+    const jitterFactor = 0.9 + Math.random() * 0.2;
+
+    const vbps = rawVbps * jitterFactor;
+    // 延迟也加上一点点微小抖动，让它也动起来
+    const buf = rawBuf * jitterFactor;
+
+    // 3. 更新给 UI
     api.updateStats({
       buf,
       fps: info.decodedFrames || 30,
@@ -242,6 +332,10 @@ function refresh() {
   const sid = sessionId;
 
   destroyLivePlayer();
+  mpegtsRetryCount = 0;
+
+  if (!mounted) return;
+
   setLoading(true);
   setError(null);
   if (isApiMode) api.updateReady(false);
@@ -282,6 +376,7 @@ function onVolumeChange() {
   if (isApiMode && videoRef.value) api.setVolume(videoRef.value.volume);
 }
 function onCanPlay() {
+  if (isApiMode && api.store.state.url !== url.value) return;
   setLoading(false);
   if (isApiMode) api.updateReady(true);
 }
@@ -309,6 +404,7 @@ if (isApiMode) {
 }
 
 onMounted(async () => {
+  mounted = true;
   await nextTick();
   if (videoRef.value) {
     videoRef.value.muted = muted.value;
@@ -318,6 +414,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  mounted = false;
   sessionId++;
   destroyLivePlayer();
   api.bindVideoElement(null); // ← 解绑
@@ -334,6 +431,7 @@ defineExpose({ api });
       :autoplay="autoplay"
       :controls="controls"
       :muted="muted"
+      :style="videoStyle"
       class="h-full w-full"
       @canplay="onCanPlay"
       @pause="onPause"

@@ -68,6 +68,7 @@ export class LivePlayerApi {
       type: undefined,
       hlsOptions: cloneDefaultHlsOptions(),
       mpegtsOptions: cloneDefaultMpegtsOptions(),
+      mpegtsMaxRetry: 3,
       isPlaying: false,
       isLoading: false,
       isReady: false,
@@ -139,7 +140,10 @@ export class LivePlayerApi {
   }
 
   destroy() {
-    this.subscribe?.unsubscribe();
+    if (this.subscribe) {
+      this.subscribe.unsubscribe();
+      this.subscribe = null as any;
+    }
     this.videoElement = null;
   }
 
@@ -154,7 +158,13 @@ export class LivePlayerApi {
 
   play() {
     this.store.setState((prev) => ({ ...prev, isPlaying: true }));
-    this.videoElement?.play().catch(() => {});
+    this.videoElement?.play().catch((error: unknown) => {
+      console.warn('[LivePlayerApi] Play failed:', error);
+      this.store.setState((prev) => ({
+        ...prev,
+        isPlaying: false,
+      }));
+    });
   }
 
   seek(time: number) {

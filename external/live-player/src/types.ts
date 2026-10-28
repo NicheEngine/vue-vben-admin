@@ -15,6 +15,13 @@ export interface MpegtsOptions {
   datasource?: Partial<Mpegts.MediaDataSource>;
 }
 
+export type LiveObjectFit =
+  | 'contain'
+  | 'cover'
+  | 'fill'
+  | 'none'
+  | 'scale-down';
+
 /** 播放器属性（用户可配置，单向输入） */
 export interface LivePlayerProps {
   autoplay?: boolean;
@@ -25,6 +32,8 @@ export interface LivePlayerProps {
   muted?: boolean;
   type?: LiveType;
   url: string;
+  objectFit?: LiveObjectFit;
+  mpegtsMaxRetry?: number;
 }
 
 /** 播放器内部状态（运行时可写） */

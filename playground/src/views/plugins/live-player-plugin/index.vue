@@ -67,6 +67,8 @@ const config = reactive<
 });
 
 const [Player, api] = useLivePlayer({
+  // -1: 无限重试，0：不重试，3：默认重试3次
+  mpegtsMaxRetry: -1,
   onError: (err) => {
     console.warn('[live] player error:', err.message);
   },
@@ -572,7 +574,7 @@ onBeforeUnmount(() => {
       <Card class="mb-4" title="网络质量实时曲线">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <NetworkChart
-            :value="(player.stats.value?.vbps || 0) / 1024"
+            :value="(player.stats.value?.vbps || 0) / 8 / 1024"
             label="实时码率"
             unit="kB/s"
             color="#22c55e"

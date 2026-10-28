@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { LiveObjectFit } from '@vben/live-player';
+
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { useLivePlayer } from '@vben/live-player';
@@ -13,9 +15,9 @@ const props = defineProps<{
 }>();
 
 const modes = [
-  { mode: 0 as const, label: '拉伸填满', fit: 'fill' },
-  { mode: 1 as const, label: '等比留黑边', fit: 'contain' },
-  { mode: 2 as const, label: '等比裁切', fit: 'cover' },
+  { mode: 0 as const, label: '拉伸填满', fit: 'fill' as LiveObjectFit },
+  { mode: 1 as const, label: '等比留黑边', fit: 'contain' as LiveObjectFit },
+  { mode: 2 as const, label: '等比裁切', fit: 'cover' as LiveObjectFit },
 ];
 
 const players = modes.map(({ mode, label, fit }) => {
@@ -30,20 +32,25 @@ const players = modes.map(({ mode, label, fit }) => {
 
 // 错峰挂载机制
 const renderStates = ref<boolean[]>([false, false, false]);
+const timers: Array<ReturnType<typeof setTimeout>> = [];
 
 onMounted(() => {
-  setTimeout(() => {
-    renderStates.value[0] = true;
-  }, 300);
-  setTimeout(() => {
-    renderStates.value[1] = true;
-  }, 1500);
-  setTimeout(() => {
-    renderStates.value[2] = true;
-  }, 3000);
+  timers.push(
+    setTimeout(() => {
+      renderStates.value[0] = true;
+    }, 300),
+    setTimeout(() => {
+      renderStates.value[1] = true;
+    }, 1500),
+    setTimeout(() => {
+      renderStates.value[2] = true;
+    }, 3000),
+  );
 });
 
 onBeforeUnmount(() => {
+  // 组件销毁前清理所有定时器
+  timers.forEach((t) => clearTimeout(t));
   players.forEach((p) => {
     void p.api.destroy();
   });
@@ -73,6 +80,7 @@ onBeforeUnmount(() => {
               :is="p.Player"
               :api="p.api"
               :url="props.url"
+              :object-fit="p.fit"
               class="h-full w-full"
               :style="{ objectFit: p.fit }"
             />
