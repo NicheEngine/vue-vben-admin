@@ -36,28 +36,27 @@ const players = modes.map(({ mode, label }) => {
   return { Player, api, mode, label };
 });
 
-// 错峰挂载标记
 const renderStates = ref<boolean[]>([false, false, false]);
+const timers: Array<ReturnType<typeof setTimeout>> = [];
 
 onMounted(() => {
-  // 将错峰时间拉大，给底层 WASM 留足初始化时间
-  setTimeout(() => {
-    renderStates.value[0] = true;
-  }, 300);
-
-  setTimeout(() => {
-    renderStates.value[1] = true;
-    // 👇 修复：加上 ?. 即可消除 TS 报错
-    setTimeout(() => players[1]?.api?.resize?.(), 500);
-  }, 1500);
-
-  setTimeout(() => {
-    renderStates.value[2] = true;
-    setTimeout(() => players[2]?.api?.resize?.(), 500);
-  }, 3000);
+  timers.push(
+    setTimeout(() => {
+      renderStates.value[0] = true;
+    }, 300),
+    setTimeout(() => {
+      renderStates.value[1] = true;
+      timers.push(setTimeout(() => players[1]?.api?.resize?.(), 500));
+    }, 1500),
+    setTimeout(() => {
+      renderStates.value[2] = true;
+      timers.push(setTimeout(() => players[2]?.api?.resize?.(), 500));
+    }, 3000),
+  );
 });
 
 onBeforeUnmount(() => {
+  timers.forEach((t) => clearTimeout(t));
   players.forEach((p) => {
     void p.api.destroy();
   });

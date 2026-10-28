@@ -20,6 +20,8 @@ import {
   Card,
   InputNumber,
   Select,
+  SpaceAddon,
+  SpaceCompact,
   Switch,
   Tag,
 } from 'antdv-next';
@@ -96,18 +98,7 @@ async function recheckJessibuca() {
   if (!jessibucaReady.value) startPolling();
 }
 
-const jessibucaViteConfig = `application: {
-  depend: true,
-  dependOptions: {
-    build: true,
-    serve: true,
-    depends: {
-      jessibuca: {
-        source: '../libraries/jessibuca',
-      },
-    },
-  },
-},`;
+const jessibucaViteConfig = `application: { depend: true, dependOptions: { build: true, serve: true, depends: { jessibuca: { source: '../libraries/jessibuca' } } } },`;
 
 const decoderJsStatus = computed(() =>
   decoderJsOk.value === false ? '缺失' : '正常',
@@ -123,8 +114,6 @@ const DEFAULT_URL = '';
 const inputUrl = ref(DEFAULT_URL);
 const currentUrl = ref(DEFAULT_URL);
 const urlHistory = ref<string[]>([]);
-
-// 👇 新增：是否清除了画面的状态
 const isCleared = ref(false);
 
 const config = reactive<JessibucaConfig>({
@@ -138,7 +127,7 @@ const config = reactive<JessibucaConfig>({
   scaleMode: 1,
   supportDblclickFullscreen: true,
   useWebFullScreen: false,
-  enableRecording: false,
+  enableRecording: true,
   recordType: 'webm',
   loadingTimeoutReplay: false,
   heartTimeoutReplay: false,
@@ -147,7 +136,6 @@ const config = reactive<JessibucaConfig>({
 });
 
 const [Player, jessibucaApi] = useJessibucaPlayer({ config });
-
 const player = createJessibucaAdapter(jessibucaApi);
 
 // ============================================================
@@ -171,9 +159,8 @@ const ratio = ref('16:9');
 const ratioBaseWidth = ref(960);
 
 const containerStyle = computed(() => {
-  if (sizeMode.value === 'fixed') {
+  if (sizeMode.value === 'fixed')
     return { width: `${fixedWidth.value}px`, height: `${fixedHeight.value}px` };
-  }
   if (sizeMode.value === 'ratio') {
     const opt =
       ratioOptions.find((o) => o.value === ratio.value) ?? DEFAULT_RATIO;
@@ -184,11 +171,10 @@ const containerStyle = computed(() => {
 });
 
 const containerRatio = computed(() => {
-  if (sizeMode.value === 'fixed') {
+  if (sizeMode.value === 'fixed')
     return fixedHeight.value
       ? (fixedWidth.value / fixedHeight.value).toFixed(2)
       : '-';
-  }
   if (sizeMode.value === 'ratio') {
     const opt =
       ratioOptions.find((o) => o.value === ratio.value) ?? DEFAULT_RATIO;
@@ -222,7 +208,7 @@ const showMultiScreen = ref(false);
 function applyUrl(u?: string) {
   const value = (u ?? inputUrl.value).trim();
   if (!value) return;
-  isCleared.value = false; // 👈 重置清除状态
+  isCleared.value = false;
   currentUrl.value = value;
   const history = urlHistory.value.filter((h) => h !== value);
   history.unshift(value);
@@ -233,7 +219,7 @@ function resetUrl() {
   inputUrl.value = DEFAULT_URL;
   currentUrl.value = DEFAULT_URL;
   urlHistory.value = [];
-  isCleared.value = false; // 👈 重置清除状态
+  isCleared.value = false;
   void jessibucaApi.clearView();
 }
 
@@ -251,50 +237,34 @@ function handleToggle() {
 }
 
 function handleReload() {
-  isCleared.value = false; // 👈 重置清除状态
+  isCleared.value = false;
   player.setLoading?.(true);
   void jessibucaApi.play();
 }
 
-// 👇 核心修改：将适配容器改为全屏播放
 function handleFullscreen() {
   const wrapper = document.querySelector('.jessibuca-player-wrapper');
   const el = wrapper?.parentElement;
-
   if (!el) return;
 
   if (document.fullscreenElement) {
     document
       .exitFullscreen()
       .then(() => {
-        nextTick(() => {
-          setTimeout(() => {
-            jessibucaApi.resize();
-          }, 100);
-        });
+        nextTick(() => setTimeout(() => jessibucaApi.resize(), 100));
       })
       .catch(console.warn);
   } else {
     el.requestFullscreen()
       .then(() => {
-        nextTick(() => {
-          setTimeout(() => {
-            jessibucaApi.resize();
-          }, 100);
-        });
+        nextTick(() => setTimeout(() => jessibucaApi.resize(), 100));
       })
-      .catch((error) => {
-        console.warn('全屏失败:', error);
-      });
+      .catch(console.warn);
   }
 }
 
 function handleFullscreenChange() {
-  nextTick(() => {
-    setTimeout(() => {
-      jessibucaApi.resize();
-    }, 100);
-  });
+  nextTick(() => setTimeout(() => jessibucaApi.resize(), 100));
 }
 
 function handleMuteChange(checked: boolean) {
@@ -305,12 +275,10 @@ function handleMuteChange(checked: boolean) {
 function handleVolumeChange(value: number) {
   config.volume = value;
   jessibucaApi.setVolume(value);
-  // 如果拖到 0，直接触发静音
   if (value === 0) {
     config.isMute = true;
     jessibucaApi.mute();
   } else if (config.isMute) {
-    // 如果拖拽大于 0，且当前处于静音状态，自动取消静音
     config.isMute = false;
     jessibucaApi.cancelMute();
   }
@@ -326,20 +294,37 @@ function handleScreenshot(): string {
   return typeof result === 'string' ? result : '';
 }
 
-// 👇 核心修改：清除画面时，加上遮罩状态
 function handleClear() {
-  isCleared.value = true; // 显示提示，并覆盖画面
+  isCleared.value = true;
   void jessibucaApi.clearView();
+}
+
+function handleStartRecord() {
+  jessibucaApi.startRecord(`jessibuca-${Date.now()}`, 'webm');
 }
 
 watch([sizeMode, fixedWidth, fixedHeight, ratio, ratioBaseWidth], () => {
   if (!jessibucaReady.value) return;
-  nextTick(() => {
-    setTimeout(() => {
-      jessibucaApi.resize();
-    }, 50);
-  });
+  nextTick(() => setTimeout(() => jessibucaApi.resize(), 50));
 });
+
+// 添加一个全局的解锁方法
+function unlockAudioContext() {
+  const AudioCtx =
+    (window as any).AudioContext || (window as any).webkitAudioContext;
+  if (!AudioCtx) return;
+
+  try {
+    const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch((error: unknown) => {
+        console.warn('Failed to resume AudioContext:', error);
+      });
+    }
+  } catch (error: unknown) {
+    console.warn('Failed to create AudioContext:', error);
+  }
+}
 
 // ============================================================
 // 六、生命周期
@@ -348,16 +333,15 @@ onMounted(async () => {
   await runFullCheck();
   if (!jessibucaReady.value) startPolling();
 
-  setTimeout(() => {
-    jessibucaApi.mute();
-  }, 1000);
-
+  setTimeout(() => jessibucaApi.mute(), 1000);
   document.addEventListener('fullscreenchange', handleFullscreenChange);
+  document.addEventListener('click', unlockAudioContext, { once: true });
 });
 
 onBeforeUnmount(() => {
   if (checkTimer) clearInterval(checkTimer);
   document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  document.removeEventListener('click', unlockAudioContext);
   void jessibucaApi.destroy();
 });
 </script>
@@ -366,8 +350,7 @@ onBeforeUnmount(() => {
   <Page title="Jessibuca 播放器">
     <template #description>
       <div class="mt-2 text-foreground/80">
-        Jessibuca 是一个纯 JavaScript 的 FLV / HLS 流媒体播放器，支持
-        WebSocket-FLV、HTTP-FLV、HLS、WebRTC 等协议。
+        Jessibuca 是一个纯 JavaScript 的 FLV / HLS 流媒体播放器。
       </div>
     </template>
 
@@ -377,11 +360,13 @@ onBeforeUnmount(() => {
       show-icon
       class="mb-4"
       message="未检测到 Jessibuca 库"
-      description="请确认 vite.config.ts 中已配置 jessibuca 依赖，并且 public/jessibuca/jessibuca.js 已加载。"
+      description="请确认静态资源加载。"
     >
       <template #action>
-        <Button size="small" @click="recheckJessibuca">重新检测</Button>
-      </template>
+<Button size="small" @click="recheckJessibuca">
+重新检测
+</Button>
+</template>
     </Alert>
 
     <Alert
@@ -392,28 +377,17 @@ onBeforeUnmount(() => {
       show-icon
       class="mb-4"
       message="Jessibuca 静态资源缺失"
-      :description="`decoder.js: ${decoderJsStatus}，decoder.wasm: ${decoderWasmStatus}。请检查 public/jessibuca/ 目录。`"
+      :description="`decoder.js: ${decoderJsStatus}，decoder.wasm: ${decoderWasmStatus}。`"
     />
 
     <Card v-if="!jessibucaReady" class="mb-4" title="vite.config.ts 配置参考">
-      <div class="text-sm text-foreground/80">
-        在
-        <code class="rounded bg-muted px-1 py-0.5 text-xs">vite.config.ts</code>
-        的
-        <code class="rounded bg-muted px-1 py-0.5 text-xs">application.dependOptions.depends</code>
-        中加入下列配置：
-      </div>
+      <div class="text-sm text-foreground/80">加入下列配置：</div>
       <pre
         class="mt-3 overflow-auto rounded-xl border border-border bg-muted p-4 text-xs"
       ><code>{{ jessibucaViteConfig }}</code></pre>
-      <div class="mt-3 text-xs text-foreground/50">
-        把 <code>../libraries/jessibuca</code> 替换为你项目里 jessibuca
-        文件的实际目录。
-      </div>
     </Card>
 
     <template v-if="jessibucaReady">
-      <!-- ===== 播放地址 ===== -->
       <Card class="mb-4" title="播放地址">
         <ProtocolDetect
           v-model="inputUrl"
@@ -421,13 +395,9 @@ onBeforeUnmount(() => {
           @apply="applyUrl"
           @reset="resetUrl"
         />
-
         <div class="mt-2 flex flex-wrap items-center gap-3 text-xs">
-          <span class="text-foreground/50">
-            当前地址：{{ currentUrl || '（空）' }}
-          </span>
+          <span class="text-foreground/50">当前地址：{{ currentUrl || '（空）' }}</span>
         </div>
-
         <div v-if="urlHistory.length > 0" class="mt-3">
           <div class="mb-2 text-xs text-foreground/60">最近播放：</div>
           <div class="flex flex-wrap gap-2">
@@ -448,7 +418,6 @@ onBeforeUnmount(() => {
         </div>
       </Card>
 
-      <!-- ===== 播放器 ===== -->
       <Card class="mb-4" title="播放器">
         <template #extra>
           <span v-if="player.isLoading.value" class="text-xs text-orange-500">加载中...</span>
@@ -470,22 +439,18 @@ onBeforeUnmount(() => {
               :config="config"
               class="h-full w-full"
             />
-
-            <!-- 👇 核心：加上清除后的遮罩提示层 -->
             <div
               v-if="isCleared"
               class="absolute inset-0 bg-black flex items-center justify-center z-10"
             >
-              <span class="text-foreground/40 text-sm">画面已清除 (流已断开)</span>
+              <span class="text-foreground/40 text-sm">画面已清除</span>
             </div>
           </div>
         </div>
       </Card>
 
-      <!-- ===== 播放状态面板 ===== -->
       <PlayStatusPanel class="mb-4" :player="player" />
 
-      <!-- ===== 画面尺寸 ===== -->
       <Card class="mb-4" title="画面尺寸">
         <div class="flex flex-wrap items-center gap-3">
           <span class="text-sm">尺寸模式：</span>
@@ -498,9 +463,7 @@ onBeforeUnmount(() => {
               { label: '固定比例', value: 'ratio' },
             ]"
           />
-          <span class="ml-2 text-xs text-foreground/50">
-            容器比例：{{ containerRatio }} | 视频比例：{{ videoRatio }}
-          </span>
+          <span class="ml-2 text-xs text-foreground/50">容器比例：{{ containerRatio }} | 视频比例：{{ videoRatio }}</span>
         </div>
 
         <div
@@ -508,19 +471,16 @@ onBeforeUnmount(() => {
           class="mt-4 flex flex-wrap items-center gap-3"
         >
           <span class="text-sm">宽：</span>
-          <InputNumber
-            v-model:value="fixedWidth"
-            :min="160"
-            :max="3840"
-            addon-after="px"
-          />
+          <!-- 👈 恢复 SpaceCompact 包装 -->
+          <SpaceCompact>
+            <InputNumber v-model:value="fixedWidth" :min="160" :max="3840" />
+            <SpaceAddon>px</SpaceAddon>
+          </SpaceCompact>
           <span class="ml-2 text-sm">高：</span>
-          <InputNumber
-            v-model:value="fixedHeight"
-            :min="90"
-            :max="2160"
-            addon-after="px"
-          />
+          <SpaceCompact>
+            <InputNumber v-model:value="fixedHeight" :min="90" :max="2160" />
+            <SpaceAddon>px</SpaceAddon>
+          </SpaceCompact>
           <Button
             size="small"
             @click="
@@ -529,9 +489,9 @@ onBeforeUnmount(() => {
                 fixedHeight = 720;
               }
             "
-          >
-            1280 × 720
-          </Button>
+            >
+1280 × 720
+</Button>
           <Button
             size="small"
             @click="
@@ -540,9 +500,9 @@ onBeforeUnmount(() => {
                 fixedHeight = 1080;
               }
             "
-          >
-            1920 × 1080
-          </Button>
+            >
+1920 × 1080
+</Button>
         </div>
 
         <div
@@ -552,26 +512,25 @@ onBeforeUnmount(() => {
           <span class="text-sm">比例：</span>
           <Select v-model:value="ratio" class="w-40" :options="ratioOptions" />
           <span class="ml-2 text-sm">宽度：</span>
-          <InputNumber
-            v-model:value="ratioBaseWidth"
-            :min="160"
-            :max="3840"
-            addon-after="px"
-          />
+          <SpaceCompact>
+            <InputNumber
+              v-model:value="ratioBaseWidth"
+              :min="160"
+              :max="3840"
+            />
+            <SpaceAddon>px</SpaceAddon>
+          </SpaceCompact>
           <span class="text-xs text-foreground/50">高度按比例自动计算</span>
-        </div>
-
-        <div v-if="sizeMode === 'auto'" class="mt-2 text-xs text-foreground/50">
-          自适应模式：容器占满父级，高度固定 480px。
         </div>
       </Card>
 
-      <!-- ===== 播放控制 ===== -->
       <Card class="mb-4" title="播放控制">
         <div class="flex flex-wrap items-center gap-3">
           <Button @click="handleToggle">
-            {{ player.isPlaying.value && !isCleared ? '暂停' : '播放' }}
-          </Button>
+{{
+            player.isPlaying.value && !isCleared ? '暂停' : '播放'
+          }}
+</Button>
           <Button @click="handleReload">重新加载</Button>
           <Button @click="handleFullscreen">全屏播放</Button>
           <Button @click="handleClear">清除画面</Button>
@@ -601,9 +560,7 @@ onBeforeUnmount(() => {
                   )
               "
             />
-            <span class="text-xs text-foreground/50 w-10 text-right shrink-0">
-              {{ Math.round(player.volume.value * 100) }}%
-            </span>
+            <span class="text-xs text-foreground/50 w-10 text-right shrink-0">{{ Math.round(player.volume.value * 100) }}%</span>
           </div>
         </div>
 
@@ -622,7 +579,6 @@ onBeforeUnmount(() => {
         </div>
       </Card>
 
-      <!-- ===== 网络质量实时曲线 ===== -->
       <Card class="mb-4" title="网络质量实时曲线">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <NetworkChart
@@ -640,30 +596,21 @@ onBeforeUnmount(() => {
         </div>
       </Card>
 
-      <!-- ===== 录制面板 ===== -->
-      <template
-        v-if="
-          player.capabilities.record &&
-          player.startRecord &&
-          player.stopRecordAndSave
-        "
-      >
+      <template v-if="player.capabilities.record">
         <RecordPanel
           class="mb-4"
           :is-recording="player.isRecording.value"
           :recording-duration="player.recordingDuration.value"
-          :start-record="player.startRecord"
-          :stop-record-and-save="player.stopRecordAndSave"
+          :start-record="handleStartRecord"
+          :stop-record-and-save="player.stopRecordAndSave!"
           :can-record="player.isPlaying.value"
         />
       </template>
 
-      <!-- ===== 截图预览 ===== -->
       <template v-if="player.capabilities.screenshot && player.screenshot">
         <ScreenshotPreview class="mb-4" :capture="handleScreenshot" />
       </template>
 
-      <!-- ===== 多屏对比 ===== -->
       <Card class="mb-4" title="多屏对比">
         <div class="mb-3 flex flex-wrap items-center gap-3">
           <span class="text-sm">启用：</span>
@@ -671,10 +618,6 @@ onBeforeUnmount(() => {
             :checked="showMultiScreen"
             @change="(val) => (showMultiScreen = val)"
           />
-          <span class="text-xs text-foreground/50">
-            开启后会创建 3 个独立播放器实例（同一路流、三种缩放模式），对
-            CPU/带宽有额外压力。
-          </span>
         </div>
         <MultiScreenCompare
           v-if="showMultiScreen"

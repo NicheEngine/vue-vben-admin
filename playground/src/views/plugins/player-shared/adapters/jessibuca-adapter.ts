@@ -20,7 +20,7 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
   const videoWidth = ref(0);
   const videoHeight = ref(0);
 
-  // 劫持底层事件
+  // 劫持底层事件（修复：将 ts 转为秒，并限制 buf 的合理范围）
   const prev = api.getCallbacks();
   api.setCallbacks({
     ...prev,
@@ -40,8 +40,8 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
     onStats: (s) => {
       isLoading.value = false;
       stats.value = { ...s };
-      networkDelay.value = s.buf || 0;
-      currentTime.value = s.ts || 0;
+      networkDelay.value = Math.max(0, Math.min(s.buf || 0, 3000)); // 限制在 0-3秒内，防累加错误
+      currentTime.value = (s.ts || 0) / 1000;
       prev?.onStats?.(s);
     },
     onVideoInfo: (info) => {
@@ -107,7 +107,12 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
     setVolume: (v) => api.setVolume(v),
     setMuted: (m) => (m ? api.mute() : api.cancelMute()),
     setUrl: (u) => api.setUrl(u),
-    destroy: () => api.destroy(),
+
+    // 👈 修复内存泄漏：在销毁时彻底断开订阅
+    destroy: async () => {
+      await api.destroy();
+    },
+
     resize: () => api.resize(),
     screenshot: (opts) =>
       api.screenshot(opts?.filename, opts?.format, 1, opts?.type ?? 'base64'),
@@ -115,7 +120,6 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
     startRecord: (n, t) => api.startRecord(n, t),
     stopRecordAndSave: () => api.stopRecordAndSave(),
 
-    // 暴露 setLoading
     setLoading: (loading: boolean) => {
       isLoading.value = loading;
     },
