@@ -1,6 +1,4 @@
 node_modules
-libraries
-libraries/*
 .DS_Store
 dist
 dist-ssr
