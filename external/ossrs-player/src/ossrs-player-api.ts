@@ -17,6 +17,10 @@ type AnyPlayer = SrsRtcPlayer | SrsRtcPublisher | SrsRtcWhipWhep;
 export class OssrsPlayerApi {
   public store: Store<OssrsPlayerState>;
 
+  public get rtcPlayer(): AnyPlayer | null {
+    return this.player;
+  }
+
   public get video(): HTMLVideoElement | null {
     return this.videoElement;
   }
@@ -24,6 +28,7 @@ export class OssrsPlayerApi {
   private callbacks: OssrsCallbacks = {};
   private componentCallbacks: OssrsCallbacks = {};
   private loadTimeout: null | ReturnType<typeof setTimeout> = null;
+  private mediaListeners: Array<{ event: string; fn: () => void }> = [];
   private player: AnyPlayer | null = null;
   private playStarted = false;
   private playToken = 0;
@@ -104,11 +109,16 @@ export class OssrsPlayerApi {
     video.addEventListener(
       'volumechange',
       () => {
-        this.store.setState((prev) => ({
-          ...prev,
-          volume: video.volume,
-          muted: video.muted,
-        }));
+        if (
+          this.store.state.volume !== video.volume ||
+          this.store.state.muted !== video.muted
+        ) {
+          this.store.setState((prev) => ({
+            ...prev,
+            volume: video.volume,
+            muted: video.muted,
+          }));
+        }
       },
       { signal },
     );
@@ -116,13 +126,18 @@ export class OssrsPlayerApi {
     video.addEventListener(
       'timeupdate',
       () => {
-        this.store.setState((prev) => ({
-          ...prev,
-          currentTime: video.currentTime,
-          videoWidth: video.videoWidth,
-          videoHeight: video.videoHeight,
-        }));
-        this.dispatch('onTimeUpdate', video.currentTime);
+        const changed =
+          Math.abs(this.store.state.currentTime - video.currentTime) > 0.1 ||
+          this.store.state.videoWidth !== video.videoWidth;
+        if (changed) {
+          this.store.setState((prev) => ({
+            ...prev,
+            currentTime: video.currentTime,
+            videoWidth: video.videoWidth || prev.videoWidth,
+            videoHeight: video.videoHeight || prev.videoHeight,
+          }));
+          this.dispatch('onTimeUpdate', video.currentTime);
+        }
       },
       { signal },
     );
@@ -137,13 +152,47 @@ export class OssrsPlayerApi {
   public destroyPlayer() {
     this.playToken++;
     this.clearLoadTimeout();
+
+    this.mediaListeners.forEach(({ event, fn }) => {
+      this.videoElement?.removeEventListener(event, fn);
+    });
+    this.mediaListeners = [];
+
+    if (this.videoElement?.srcObject) {
+      const stream = this.videoElement.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      this.videoElement.srcObject = null;
+    }
+
     this.player?.close();
     this.player = null;
     this.playStarted = false;
+
     if (this.videoElement) {
       this.videoElement.pause();
-      this.videoElement.srcObject = null;
+      this.videoElement.removeAttribute('src');
+      this.videoElement.load();
     }
+
+    this.store.setState((prev) => ({
+      ...prev,
+      isPlaying: false,
+      isReady: false,
+      isLoading: false,
+      videoWidth: 0,
+      videoHeight: 0,
+      currentTime: 0,
+    }));
+  }
+
+  public getCallbacks(): Readonly<OssrsCallbacks> {
+    return this.callbacks;
+  }
+
+  public async getStats() {
+    const pc = this.player?.pc;
+    if (!pc) return null;
+    return pc.getStats();
   }
 
   public pause() {
@@ -154,9 +203,7 @@ export class OssrsPlayerApi {
     const video = this.videoElement;
     if (!video) return;
 
-    if (this.store.state.isLoading && this.store.state.url === url) {
-      return;
-    }
+    if (this.store.state.isLoading && this.store.state.url === url) return;
 
     this.destroyPlayer();
     const token = ++this.playToken;
@@ -189,50 +236,71 @@ export class OssrsPlayerApi {
         protocol === 'whep' ? SrsRtcWhipWhepAsync() : SrsRtcPlayerAsync();
       this.player = p;
 
-      video.srcObject = null;
       video.srcObject = p.stream;
-
-      video.muted = true;
-      video.setAttribute('muted', '');
+      video.muted = this.store.state.muted;
+      video.setAttribute('muted', this.store.state.muted ? '' : 'false');
       video.setAttribute('playsinline', '');
       video.setAttribute('autoplay', '');
 
       p.ontrack = (event: RTCTrackEvent) => {
         if (token !== this.playToken) return;
 
+        if (!p.stream.getTracks().includes(event.track)) {
+          p.stream.addTrack(event.track);
+        }
+
+        // 不要做任何 applyConstraints！
+
+        if (event.track.kind === 'video') {
+          const syncDimensions = () => {
+            if (token !== this.playToken) return;
+            if (video.videoWidth > 0) {
+              this.store.setState((prev) => ({
+                ...prev,
+                videoWidth: video.videoWidth,
+                videoHeight: video.videoHeight,
+              }));
+            } else {
+              setTimeout(syncDimensions, 200);
+            }
+          };
+          syncDimensions();
+        }
+
         if (event.track.kind === 'video' && !this.playStarted) {
           this.playStarted = true;
 
           const forcePlay = () => {
+            if (token !== this.playToken) return;
             if (video.paused) {
               video
                 .play()
                 .then(() => {
                   this.clearLoadTimeout();
-                  this.store.setState((prev) => ({
-                    ...prev,
-                    isLoading: false,
-                    isReady: true,
-                    isPlaying: true,
-                    muted: true,
-                  }));
-                  this.dispatch('onReady');
-                  this.dispatch('onLoadEnd');
+                  if (token === this.playToken) {
+                    this.store.setState((prev) => ({
+                      ...prev,
+                      isLoading: false,
+                      isReady: true,
+                      isPlaying: true,
+                    }));
+                    this.dispatch('onReady');
+                    this.dispatch('onLoadEnd');
+                  }
                 })
                 .catch((error) => {
-                  console.error('[OssrsPlayer] 自动播放被拦截:', error);
+                  console.error('[SrsPlayer] 自动播放失败:', error);
                 });
             }
           };
 
+          this.mediaListeners.push(
+            { event: 'loadeddata', fn: forcePlay },
+            { event: 'canplay', fn: forcePlay },
+          );
           video.addEventListener('loadeddata', forcePlay, { once: true });
           video.addEventListener('canplay', forcePlay, { once: true });
-
-          setTimeout(() => {
-            if (video.paused) {
-              video.play().catch(() => {});
-            }
-          }, 100);
+          setTimeout(forcePlay, 100);
         }
       };
 
@@ -248,7 +316,6 @@ export class OssrsPlayerApi {
   public setCallbacks(cb: OssrsCallbacks) {
     this.callbacks = { ...this.callbacks, ...cb };
   }
-
   public setComponentCallbacks(cb: OssrsCallbacks) {
     this.componentCallbacks = cb;
   }
@@ -259,7 +326,12 @@ export class OssrsPlayerApi {
   }
 
   public setMuted(muted: boolean) {
-    if (this.videoElement) this.videoElement.muted = muted;
+    if (this.videoElement) {
+      this.videoElement.muted = muted;
+      if (!muted && this.videoElement.paused) {
+        this.videoElement.play().catch(console.warn);
+      }
+    }
     this.store.setState((prev) => ({ ...prev, muted }));
   }
 
@@ -272,11 +344,8 @@ export class OssrsPlayerApi {
   public toggle() {
     const video = this.videoElement;
     if (!video) return;
-    if (video.paused) {
-      video.play().catch(() => {});
-    } else {
-      video.pause();
-    }
+    if (video.paused) video.play().catch(() => {});
+    else video.pause();
   }
 
   private clearLoadTimeout() {

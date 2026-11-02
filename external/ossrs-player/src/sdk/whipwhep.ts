@@ -42,7 +42,8 @@ class SrsRtcWhipWhepAsyncImpl implements SrsRtcWhipWhep {
     }
     const pc = this.ensurePc();
 
-    // 严格对齐官方 SDK：WHEP 默认只拉取 video
+    // 👈 核心修复：必须显式添加音频接收器，否则没有声音！
+    pc.addTransceiver('audio', { direction: 'recvonly' });
     pc.addTransceiver('video', { direction: 'recvonly' });
 
     return this.negotiateWhipWhep(url, pc);
@@ -93,9 +94,6 @@ class SrsRtcWhipWhepAsyncImpl implements SrsRtcWhipWhep {
     return this.pc;
   }
 
-  /**
-   * 提取公共的 WHIP/WHEP 协商逻辑
-   */
   private async negotiateWhipWhep(
     url: string,
     pc: RTCPeerConnection,

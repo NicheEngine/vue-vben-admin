@@ -36,6 +36,7 @@ export interface OssrsCallbacks {
   onLoadEnd?: () => void;
   onReady?: () => void;
   onTimeUpdate?: (time: number) => void;
+  onTrack?: (event: RTCTrackEvent) => void;
 }
 
 export interface OssrsApiOptions extends OssrsCallbacks {

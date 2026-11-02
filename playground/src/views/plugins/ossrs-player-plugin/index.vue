@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { OssrsPlayerProps } from '@vben/ossrs-player';
 
-import { computed, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
 import { Page } from '@vben/common-ui';
 import { useOssrsPlayer } from '@vben/ossrs-player';
@@ -21,20 +21,21 @@ import {
 
 import {
   createOssrsAdapter,
+  NetworkChart,
   PlayStatusPanel,
   ProtocolDetect,
+  RecordPanel,
+  ScreenshotPreview,
 } from '../player-shared';
+import MultiScreenCompare from './components/multi-screen-compare.vue';
 
 defineOptions({ name: 'OssrsPluginExample' });
 
-// ============================================================
-// 一、播放器实例与配置
-// ============================================================
 const DEFAULT_URL = '';
 const inputUrl = ref(DEFAULT_URL);
 const currentUrl = ref(DEFAULT_URL);
 const urlHistory = ref<string[]>([]);
-const isPlayerDestroyed = ref(false);
+const isCleared = ref(false);
 
 const config = reactive<OssrsPlayerProps>({
   autoPlay: true,
@@ -50,9 +51,24 @@ const [Player, api] = useOssrsPlayer({
 
 const player = createOssrsAdapter(api, config.protocol);
 
-// ============================================================
-// 二、响应式状态
-// ============================================================
+const vbps = ref(0);
+const delay = ref(0);
+
+watch(
+  () => player.stats.value,
+  (newStats) => {
+    if (newStats) vbps.value = newStats.vbps || 0;
+  },
+  { deep: true },
+);
+
+watch(
+  () => player.networkDelay.value,
+  (newDelay) => {
+    delay.value = newDelay || 0;
+  },
+);
+
 const isPlaying = api.useSelector((s: any) => s.isPlaying);
 const volume = api.useSelector((s: any) => s.volume);
 const muted = api.useSelector((s: any) => s.muted);
@@ -69,9 +85,6 @@ const effectiveType = computed(() => {
   return '未知';
 });
 
-// ============================================================
-// 三、画面尺寸
-// ============================================================
 type SizeMode = 'auto' | 'fixed' | 'ratio';
 const sizeMode = ref<SizeMode>('auto');
 const fixedWidth = ref(800);
@@ -121,9 +134,15 @@ const videoRatio = computed(() => {
   return (player.videoWidth.value / player.videoHeight.value).toFixed(2);
 });
 
-// ============================================================
-// 四、交互
-// ============================================================
+const scaleMode = ref<0 | 1 | 2>(1);
+const SCALE_MODE_LABELS: Record<0 | 1 | 2, string> = {
+  0: '拉伸填满',
+  1: '等比留黑边',
+  2: '等比裁切',
+};
+
+const showMultiScreen = ref(false);
+
 function applyUrl(u?: string) {
   const value = (u ?? inputUrl.value).trim();
   if (!value) return;
@@ -138,38 +157,36 @@ function applyUrl(u?: string) {
     config.protocol = 'rtc';
   }
 
+  isCleared.value = false;
   currentUrl.value = value;
-  isPlayerDestroyed.value = false;
 
   const history = urlHistory.value.filter((h) => h !== value);
   history.unshift(value);
   urlHistory.value = history.slice(0, 10);
+
+  api.play(value, config.protocol);
 }
 
 function resetUrl() {
   inputUrl.value = DEFAULT_URL;
   currentUrl.value = DEFAULT_URL;
   urlHistory.value = [];
-  isPlayerDestroyed.value = false;
-  api.destroy();
+  isCleared.value = false;
+  api.destroyPlayer();
 }
 
 function handleToggle() {
-  if (isPlayerDestroyed.value) {
-    if (currentUrl.value) {
-      isPlayerDestroyed.value = false;
-      setTimeout(() => api.toggle(), 100);
-    }
+  if (isCleared.value) {
+    isCleared.value = false;
+    if (currentUrl.value) api.play(currentUrl.value, config.protocol);
     return;
   }
   api.toggle();
 }
 
 function handleReload() {
-  isPlayerDestroyed.value = true;
-  setTimeout(() => {
-    isPlayerDestroyed.value = false;
-  }, 50);
+  isCleared.value = false;
+  if (currentUrl.value) api.play(currentUrl.value, config.protocol);
 }
 
 function handleMuteChange(checked: boolean) {
@@ -179,23 +196,38 @@ function handleMuteChange(checked: boolean) {
 
 function handleVolumeChange(value: number) {
   api.setVolume(value);
-}
-
-function handleFullscreen() {
-  const videoContainer = document.querySelector('video')?.parentElement;
-  if (!videoContainer) return;
-
-  if (document.fullscreenElement) {
-    document.exitFullscreen().catch(console.warn);
-  } else {
-    videoContainer.requestFullscreen().catch(console.warn);
+  if (value === 0) {
+    config.muted = true;
+    api.setMuted(true);
+  } else if (config.muted) {
+    config.muted = false;
+    api.setMuted(false);
   }
 }
 
+function handleFullscreen() {
+  if (document.fullscreenElement) void player.exitFullscreen?.();
+  else void player.requestFullscreen?.();
+}
+
 function handleClear() {
-  isPlayerDestroyed.value = true;
+  isCleared.value = true;
   api.pause();
 }
+
+function handleScaleModeChange(mode: 0 | 1 | 2) {
+  scaleMode.value = mode;
+  player.setScaleMode?.(mode);
+}
+
+function handleScreenshot(): string {
+  const result = player.screenshot?.();
+  return typeof result === 'string' ? result : '';
+}
+
+onBeforeUnmount(() => {
+  void player.destroy();
+});
 </script>
 
 <template>
@@ -208,7 +240,6 @@ function handleClear() {
       </div>
     </template>
 
-    <!-- ===== 引导提示 ===== -->
     <Alert
       class="mb-4"
       type="info"
@@ -218,17 +249,19 @@ function handleClear() {
       <template #description>
         <div class="text-xs leading-relaxed mt-1">
           1. 在 Oryx 后台推流成功后，进入 <b>“流信息”</b> 页面。<br />
-          2. 找到 <b>WebRTC</b> 播放地址，格式通常为：<code>webrtc://[IP]:[PORT]/live/[流名称]</code>
+          2. 找到 <b>WebRTC</b> 播放地址，格式通常为：
+          <code>webrtc://[IP]:[PORT]/live/[流名称]</code>
           或 <code>rtc://[IP]:[PORT]/live/[流名称]</code>。<br />
           3. 将地址填入上方输入框点击应用即可（若使用 WHEP 协议，地址格式为
           <code>http://.../whep/</code>）。<br />
-          <span class="text-red-500 font-medium">⚠️ 重要：如果使用 localhost 或 127.0.0.1，请确保浏览器不受 WebRTC
-            安全上下文限制，建议用局域网 IP 或 HTTPS 环境测试。</span>
+          <span class="text-red-500 font-medium">
+            ⚠️ 重要：如果使用 localhost 或 127.0.0.1，请确保浏览器不受 WebRTC
+            安全上下文限制，建议用局域网 IP 或 HTTPS 环境测试。
+          </span>
         </div>
       </template>
     </Alert>
 
-    <!-- ===== 播放地址 ===== -->
     <Card class="mb-4" title="播放地址">
       <ProtocolDetect
         v-model="inputUrl"
@@ -238,7 +271,9 @@ function handleClear() {
       />
       <div class="mt-2 text-xs text-foreground/50">
         当前地址：{{ currentUrl || '（空）' }} | 推断类型：
-        <Tag color="blue">{{ effectiveType }}</Tag>
+        <Tag color="blue">
+          {{ effectiveType }}
+        </Tag>
       </div>
       <div v-if="urlHistory.length > 0" class="mt-3">
         <div class="mb-2 text-xs text-foreground/60">最近播放：</div>
@@ -260,15 +295,18 @@ function handleClear() {
       </div>
     </Card>
 
-    <!-- ===== 播放器 ===== -->
     <Card class="mb-4" title="播放器">
       <template #extra>
         <span v-if="player.isLoading.value" class="text-xs text-orange-500">连接中...</span>
-        <span v-else-if="player.error.value" class="text-xs text-red-500">错误：{{ player.error.value }}</span>
+        <span v-else-if="player.error.value" class="text-xs text-red-500">
+          错误：{{ player.error.value }}
+        </span>
         <span
-          v-else-if="player.isPlaying.value && !isPlayerDestroyed"
+          v-else-if="player.isPlaying.value && !isCleared"
           class="text-xs text-green-500"
-          >播放中</span>
+        >
+          播放中
+        </span>
       </template>
 
       <div class="flex justify-center">
@@ -277,7 +315,6 @@ function handleClear() {
           :style="containerStyle"
         >
           <Player
-            v-if="!isPlayerDestroyed"
             :api="api"
             :url="currentUrl"
             :protocol="config.protocol"
@@ -285,9 +322,8 @@ function handleClear() {
             :autoplay="config.autoPlay"
             class="h-full w-full"
           />
-
           <div
-            v-else
+            v-if="isCleared"
             class="absolute inset-0 bg-black flex items-center justify-center z-10"
           >
             <span class="text-foreground/40 text-sm">画面已清除 (连接已断开)</span>
@@ -296,10 +332,8 @@ function handleClear() {
       </div>
     </Card>
 
-    <!-- ===== 播放状态面板 ===== -->
     <PlayStatusPanel class="mb-4" :player="player" />
 
-    <!-- ===== 画面尺寸 ===== -->
     <Card class="mb-4" title="画面尺寸">
       <div class="flex flex-wrap items-center gap-3">
         <span class="text-sm">尺寸模式：</span>
@@ -368,20 +402,16 @@ function handleClear() {
         </SpaceCompact>
         <span class="text-xs text-foreground/50">高度按比例自动计算</span>
       </div>
-
       <div v-if="sizeMode === 'auto'" class="mt-2 text-xs text-foreground/50">
         自适应模式：容器占满父级，高度固定 480px。
       </div>
     </Card>
 
-    <!-- ===== 播放控制 ===== -->
     <Card class="mb-4" title="播放控制">
       <div class="flex flex-wrap items-center gap-3">
         <Button @click="handleToggle">
-{{
-          isPlaying && !isPlayerDestroyed ? '暂停' : '播放'
-        }}
-</Button>
+          {{ isPlaying && !isCleared ? '暂停' : '播放' }}
+        </Button>
         <Button @click="handleReload">重新加载</Button>
         <Button @click="handleFullscreen">全屏播放</Button>
         <Button @click="handleClear">清除画面</Button>
@@ -408,6 +438,20 @@ function handleClear() {
         </div>
       </div>
 
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <span class="text-sm shrink-0">缩放模式：</span>
+        <Button
+          v-for="mode in [0, 1, 2]"
+          :key="mode"
+          :type="scaleMode === mode ? 'primary' : 'default'"
+          size="small"
+          @click="handleScaleModeChange(mode as 0 | 1 | 2)"
+        >
+          {{ mode === 0 ? '拉伸' : mode === 1 ? '等比留黑边' : '等比裁切' }}
+        </Button>
+        <Tag color="blue">{{ SCALE_MODE_LABELS[scaleMode] }}</Tag>
+      </div>
+
       <div
         class="mt-4 flex flex-wrap items-center gap-6 border-t border-border pt-4"
       >
@@ -427,6 +471,61 @@ function handleClear() {
           />
         </div>
       </div>
+    </Card>
+
+    <Card class="mb-4" title="网络质量实时曲线">
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <NetworkChart
+          :value="vbps / 8 / 1024"
+          label="实时码率"
+          unit="kB/s"
+          color="#22c55e"
+        />
+        <NetworkChart
+          :value="delay"
+          label="网络延迟 (Jitter Buffer)"
+          unit="ms"
+          color="#f59e0b"
+        />
+      </div>
+    </Card>
+
+    <!-- ===== 录制面板 ===== -->
+    <template v-if="player.capabilities.record">
+      <RecordPanel
+        class="mb-4"
+        :is-recording="player.isRecording.value"
+        :recording-duration="player.recordingDuration.value"
+        :start-record="player.startRecord!"
+        :stop-record-and-save="player.stopRecordAndSave!"
+        :can-record="player.isPlaying.value"
+      />
+    </template>
+
+    <!-- ===== 截图预览 ===== -->
+    <template v-if="player.capabilities.screenshot && player.screenshot">
+      <ScreenshotPreview class="mb-4" :capture="handleScreenshot" />
+    </template>
+
+    <Card class="mb-4" title="多屏对比">
+      <div class="mb-3 flex flex-wrap items-center gap-3">
+        <span class="text-sm">启用：</span>
+        <Switch
+          :checked="showMultiScreen"
+          @change="(val) => (showMultiScreen = val)"
+        />
+        <span class="text-xs text-foreground/50">
+          开启后会创建 3 个独立实例（同一路流、三种缩放模式）。WebRTC 多实例对
+          CPU 有一定压力。
+        </span>
+      </div>
+      <MultiScreenCompare
+        v-if="showMultiScreen"
+        :url="currentUrl"
+        :width="320"
+        :height="180"
+        :protocol="config.protocol"
+      />
     </Card>
   </Page>
 </template>

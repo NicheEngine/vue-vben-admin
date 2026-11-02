@@ -51,7 +51,8 @@ export interface IPlayerApi {
   setMuted: (m: boolean) => void;
   setUrl: (url: string) => void;
   destroy: () => Promise<void>;
-
+  requestFullscreen?: () => Promise<void>;
+  exitFullscreen?: () => Promise<void>;
   // ===== 可选控制（capabilities 决定是否可用） =====
   seek?: (t: number) => void;
   resize?: () => void;
