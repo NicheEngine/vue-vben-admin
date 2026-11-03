@@ -307,14 +307,6 @@ onBeforeUnmount(() => {
       </template>
     </Alert>
 
-    <Alert
-      v-else
-      class="mb-4"
-      type="info"
-      show-icon
-      message="基于 @easydarwin/easyplayer 的封装。支持 HTTP-FLV 和 HLS 协议。"
-    />
-
     <Card v-if="!easyPlayerReady" class="mb-4" title="vite.config.ts 配置参考">
       <div class="text-sm text-foreground/80">加入下列配置：</div>
       <pre
