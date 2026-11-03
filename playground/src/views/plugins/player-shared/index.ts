@@ -1,3 +1,4 @@
+export { createEasyAdapter } from './adapters/easy-adapter';
 export { createJessibucaAdapter } from './adapters/jessibuca-adapter';
 export { createLiveAdapter } from './adapters/live-adapter';
 export { createOssrsAdapter } from './adapters/ossrs-adapter';

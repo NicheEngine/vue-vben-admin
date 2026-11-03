@@ -580,17 +580,14 @@
             (fe[e] = 1),
             null === ce &&
               'undefined' != typeof setInterval &&
-              (ce = setInterval(
-                function () {
-                  if (A) return (clearInterval(ce), void (ce = null));
-                  var e = !1;
-                  for (var r in fe)
-                    (e || ((e = !0), _('still waiting on run dependencies:')),
-                      _('dependency: ' + r));
-                  e && _('(end of list)');
-                },
-                1e4,
-              )))
+              (ce = setInterval(function () {
+                if (A) return (clearInterval(ce), void (ce = null));
+                var e = !1;
+                for (var r in fe)
+                  (e || ((e = !0), _('still waiting on run dependencies:')),
+                    _('dependency: ' + r));
+                e && _('(end of list)');
+              }, 1e4)))
           : _('warning: run dependency added without ID'));
     }
     function he(e) {
@@ -4964,18 +4961,12 @@
         ue > 0 ||
           (r.setStatus
             ? (r.setStatus('Running...'),
-              setTimeout(
-                function () {
-                  (setTimeout(
-                    function () {
-                      r.setStatus('');
-                    },
-                    1,
-                  ),
-                    t());
-                },
-                1,
-              ))
+              setTimeout(function () {
+                (setTimeout(function () {
+                  r.setStatus('');
+                }, 1),
+                  t());
+              }, 1))
             : t(),
           oe()));
     }
@@ -5527,12 +5518,9 @@
                 ));
               let r = t.offscreenCanvas.transferToImageBitmap();
               (postMessage({ cmd: g, buffer: r, delay: n.delay, ts: 0 }, [r]),
-                setTimeout(
-                  function () {
-                    e.close ? e.close() : e.destroy();
-                  },
-                  100,
-                ));
+                setTimeout(function () {
+                  e.close ? e.close() : e.destroy();
+                }, 100));
             },
             error: function (e) {
               console.error(e);
@@ -5845,35 +5833,32 @@
                 ? t.decode(e.payload, e.ts)
                 : e.decoder.decode(e.payload, e.ts);
             };
-            this.stopId = setInterval(
-              () => {
-                if (!n.isDestroyed && e.length)
-                  if (this.dropping) {
+            this.stopId = setInterval(() => {
+              if (!n.isDestroyed && e.length)
+                if (this.dropping) {
+                  for (
+                    (t = e.shift()).type === b && 0 === t.payload[1] && r(t);
+                    !t.isIFrame && e.length;
+                  )
+                    (t = e.shift()).type === b && 0 === t.payload[1] && r(t);
+                  t.isIFrame && ((this.dropping = !1), r(t));
+                } else {
+                  var t = e[0];
+                  if (-1 === this.getDelay(t.ts)) (e.shift(), r(t));
+                  else if (
+                    this.delay >
+                    n.opt.videoBuffer + n.opt.videoBufferDelay
+                  )
+                    (this.resetDelay(), (this.dropping = !0));
+                  else
                     for (
-                      (t = e.shift()).type === b && 0 === t.payload[1] && r(t);
-                      !t.isIFrame && e.length;
+                      ;
+                      e.length &&
+                      ((t = e[0]), this.getDelay(t.ts) > n.opt.videoBuffer);
                     )
-                      (t = e.shift()).type === b && 0 === t.payload[1] && r(t);
-                    t.isIFrame && ((this.dropping = !1), r(t));
-                  } else {
-                    var t = e[0];
-                    if (-1 === this.getDelay(t.ts)) (e.shift(), r(t));
-                    else if (
-                      this.delay >
-                      n.opt.videoBuffer + n.opt.videoBufferDelay
-                    )
-                      (this.resetDelay(), (this.dropping = !0));
-                    else
-                      for (
-                        ;
-                        e.length &&
-                        ((t = e[0]), this.getDelay(t.ts) > n.opt.videoBuffer);
-                      )
-                        (e.shift(), r(t));
-                  }
-              },
-              10,
-            );
+                      (e.shift(), r(t));
+                }
+            }, 10);
           },
           close: function () {
             ((n.isDestroyed = !0),

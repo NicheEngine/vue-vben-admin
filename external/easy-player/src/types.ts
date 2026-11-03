@@ -1,5 +1,7 @@
 import type { Ref } from 'vue';
 
+import type { EasyPlayerApi } from './easy-player-api';
+
 /** 解码类型，仅 flv 有效 */
 export type EasyDecodeType = 'auto' | 'soft';
 
@@ -23,6 +25,7 @@ export interface EasyPlayerProps {
   live?: boolean;
   loop?: boolean;
   muted?: boolean;
+  playerApi?: EasyPlayerApi;
   playerStyle?: string;
   poster?: string;
   progress?: boolean;
@@ -33,7 +36,12 @@ export interface EasyPlayerProps {
   resolution?: string;
   resolutionDefault?: EasyResolution | string;
   restartTime?: number;
+  scaleMode?: 0 | 1 | 2;
+  /** 离屏继续播放（拦截滚动触发的自动暂停），默认 false */
+  keepPlayingOffscreen?: boolean;
   showEnterprise?: boolean;
+  showCustomButton?: boolean;
+  url?: string;
   videoTitle?: string;
   videoUrl: string;
   watermark?: string;
@@ -47,6 +55,10 @@ export interface EasyPlayerState {
   isPlaying: boolean;
   isReady: boolean;
   volume: number;
+  videoWidth: number;
+  videoHeight: number;
+  scaleMode: 0 | 1 | 2;
+  keepPlayingOffscreen: boolean;
 }
 
 export type EasyPlayerStoreState = EasyPlayerProps & EasyPlayerState;
@@ -73,15 +85,17 @@ export interface EasyPlayerInstance {
   exitFullscreen?: () => void;
   fullscreen?: () => void;
   initPlayer?: () => void;
+  pause?: () => void;
+  play?: () => void;
   restartPlayer?: () => void;
-  snapshot?: () => void;
+  snapshot?: () => Promise<unknown> | unknown;
   switchAudio?: () => void;
   switchRecording?: () => void;
   switchVideo?: () => void;
   [key: string]: any;
 }
 
-/** Store 接口（简化，实际由 @vben-core/shared/store 提供） */
+/** Store 接口 */
 export interface EasyPlayerStore {
   state: EasyPlayerStoreState;
   setState: (
@@ -89,33 +103,8 @@ export interface EasyPlayerStore {
   ) => void;
 }
 
-/** 扩展 API，带 useSelector */
-export interface ExtendedEasyPlayerApi {
-  store: EasyPlayerStore;
+export interface ExtendedEasyPlayerApi extends EasyPlayerApi {
   useSelector: <T = EasyPlayerStoreState>(
     selector?: (state: EasyPlayerStoreState) => T,
   ) => Readonly<Ref<T>>;
-  bindInstance: (instance: EasyPlayerInstance | null) => void;
-  destroy: () => void;
-  destroyPlayer: () => void;
-  exitFullscreen: () => void;
-  fullscreen: () => void;
-  initPlayer: () => void;
-  pause: () => void;
-  play: () => void;
-  replay: () => void;
-  seek: (time: number) => void;
-  setError: (error: null | string) => void;
-  setLoading: (loading: boolean) => void;
-  setMuted: (muted: boolean) => void;
-  setUrl: (url: string) => void;
-  setVolume: (volume: number) => void;
-  snapshot: () => void;
-  switchAudio: () => void;
-  switchRecording: () => void;
-  switchVideo: () => void;
-  toggle: () => void;
-  updateCurrentTime: (time: number) => void;
-  updatePlaying: (playing: boolean) => void;
-  updateReady: (ready: boolean) => void;
 }

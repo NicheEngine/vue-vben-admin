@@ -773,18 +773,12 @@
                         : Pe(r, (r.target = '_blank'))
                       : Pe(r))
                   : ((r.href = o.createObjectURL(e)),
-                    setTimeout(
-                      function () {
-                        o.revokeObjectURL(r.href);
-                      },
-                      4e4,
-                    ),
-                    setTimeout(
-                      function () {
-                        Pe(r);
-                      },
-                      0,
-                    )));
+                    setTimeout(function () {
+                      o.revokeObjectURL(r.href);
+                    }, 4e4),
+                    setTimeout(function () {
+                      Pe(r);
+                    }, 0)));
             }
           : 'msSaveOrOpenBlob' in navigator
             ? function (e, t, i) {
@@ -849,12 +843,9 @@
                     d = A.createObjectURL(e);
                   (o ? (o.location = d) : (location.href = d),
                     (o = null),
-                    setTimeout(
-                      function () {
-                        A.revokeObjectURL(d);
-                      },
-                      4e4,
-                    ));
+                    setTimeout(function () {
+                      A.revokeObjectURL(d);
+                    }, 4e4));
                 }
               };
   class ze extends Qe {
@@ -1335,17 +1326,14 @@
           .then(() => {
             ((this._delayPlay = !1),
               this.player.debug.log('Video', '_play success'),
-              setTimeout(
-                () => {
-                  this.isPlaying() ||
-                    (this.player.debug.warn(
-                      'Video',
-                      'play failed and retry play',
-                    ),
-                    this._play());
-                },
-                100,
-              ));
+              setTimeout(() => {
+                this.isPlaying() ||
+                  (this.player.debug.warn(
+                    'Video',
+                    'play failed and retry play',
+                  ),
+                  this._play());
+              }, 100));
           })
           .catch((e) => {
             this.player.debug.error('Video', '_play error', e);
@@ -1354,12 +1342,9 @@
     pause(e) {
       e
         ? this.$videoElement && this.$videoElement.pause()
-        : setTimeout(
-            () => {
-              this.$videoElement && this.$videoElement.pause();
-            },
-            100,
-          );
+        : setTimeout(() => {
+            this.$videoElement && this.$videoElement.pause();
+          }, 100);
     }
     clearView() {}
     screenshot(e, t, i, o) {
@@ -1843,12 +1828,9 @@
           if ('paused' === s.state)
             return (
               s.resumeRecording(),
-              void setTimeout(
-                function () {
-                  n(e);
-                },
-                1,
-              )
+              void setTimeout(function () {
+                n(e);
+              }, 1)
             );
           ('recording' === s.state ||
             t.disableLogs ||
@@ -1898,12 +1880,9 @@
           return (
             t.disableLogs ||
               console.warn('Blob encoder did not finish its job yet.'),
-            void setTimeout(
-              function () {
-                d(e, i);
-              },
-              1e3,
-            )
+            void setTimeout(function () {
+              d(e, i);
+            }, 1e3)
           );
         if ('undefined' == typeof Worker || navigator.mozGetUserMedia) {
           var r = new FileReader();
@@ -1942,18 +1921,12 @@
               (e >= s.recordingDuration
                 ? n(s.onRecordingStopped)
                 : ((e += 1e3),
-                  setTimeout(
-                    function () {
-                      c(e);
-                    },
-                    1e3,
-                  )))
-            : setTimeout(
-                function () {
-                  c(e);
-                },
-                1e3,
-              ));
+                  setTimeout(function () {
+                    c(e);
+                  }, 1e3)))
+            : setTimeout(function () {
+                c(e);
+              }, 1e3));
       }
       function u(e) {
         s &&
@@ -2515,12 +2488,9 @@
         n = function (e, t) {
           var i = new Date().getTime(),
             o = Math.max(0, 16 - (i - A)),
-            r = setTimeout(
-              function () {
-                e(i + o);
-              },
-              o,
-            );
+            r = setTimeout(function () {
+              e(i + o);
+            }, o);
           return ((A = i + o), r);
         };
       }
@@ -2868,13 +2838,10 @@
               ((this.recordingCallback = e),
               'recording' === r.state && r.stop(),
               'number' == typeof t.timeSlice &&
-                setTimeout(
-                  function () {
-                    ((i.blob = new Blob(s, { type: n(t) })),
-                      i.recordingCallback(i.blob));
-                  },
-                  100,
-                )));
+                setTimeout(function () {
+                  ((i.blob = new Blob(s, { type: n(t) })),
+                    i.recordingCallback(i.blob));
+                }, 100)));
         }),
         (this.pause = function () {
           r && 'recording' === r.state && r.pause();
@@ -3439,12 +3406,9 @@
           }).length),
           (function e() {
             ++n !== A
-              ? setTimeout(
-                  function () {
-                    a.functionToLoop(e, n);
-                  },
-                  1,
-                )
+              ? setTimeout(function () {
+                  a.functionToLoop(e, n);
+                }, 1)
               : a.callback();
           })());
       }
@@ -3485,23 +3449,20 @@
       this.stop = function (e) {
         ((e = e || function () {}), (r = !0));
         var i = this;
-        setTimeout(
-          function () {
-            o(d.frames, -1, null, null, function (o) {
-              ((d.frames = o),
-                t.advertisement &&
-                  t.advertisement.length &&
-                  (d.frames = t.advertisement.concat(d.frames)),
-                d.compile(function (t) {
-                  ((i.blob = t),
-                    i.blob.forEach &&
-                      (i.blob = new Blob([], { type: 'video/webm' })),
-                    e && e(i.blob));
-                }));
-            });
-          },
-          10,
-        );
+        setTimeout(function () {
+          o(d.frames, -1, null, null, function (o) {
+            ((d.frames = o),
+              t.advertisement &&
+                t.advertisement.length &&
+                (d.frames = t.advertisement.concat(d.frames)),
+              d.compile(function (t) {
+                ((i.blob = t),
+                  i.blob.forEach &&
+                    (i.blob = new Blob([], { type: 'video/webm' })),
+                  e && e(i.blob));
+              }));
+          });
+        }, 10);
       };
       var s = !1;
       function a() {
@@ -3872,12 +3833,9 @@
             (h = n(function e(i) {
               if (!0 !== p.clearedRecordedData) {
                 if (r)
-                  return setTimeout(
-                    function () {
-                      e(i);
-                    },
-                    100,
-                  );
+                  return setTimeout(function () {
+                    e(i);
+                  }, 100);
                 ((h = n(e)),
                   void 0 === typeof l && (l = i),
                   i - l < 90 ||
@@ -4356,22 +4314,19 @@
                 ((r.width = t.width), (r.height = t.height));
                 var e = r.getContext('2d'),
                   n = 1e3 / t.frameRate,
-                  A = setInterval(
-                    function () {
-                      if (
-                        (i && (clearInterval(A), o.close()),
-                        a &&
-                          ((a = !1),
-                          t.onVideoProcessStarted && t.onVideoProcessStarted()),
-                        e.drawImage(s, 0, 0),
-                        'closed' !== o._controlledReadableStream.state)
-                      )
-                        try {
-                          o.enqueue(e.getImageData(0, 0, t.width, t.height));
-                        } catch (e) {}
-                    },
-                    n,
-                  );
+                  A = setInterval(function () {
+                    if (
+                      (i && (clearInterval(A), o.close()),
+                      a &&
+                        ((a = !1),
+                        t.onVideoProcessStarted && t.onVideoProcessStarted()),
+                      e.drawImage(s, 0, 0),
+                      'closed' !== o._controlledReadableStream.state)
+                    )
+                      try {
+                        o.enqueue(e.getImageData(0, 0, t.width, t.height));
+                      } catch (e) {}
+                  }, n);
               }),
               s.play());
           },
@@ -4637,13 +4592,10 @@
         this.recorder.startRecording(),
         e.log('Recorder', 'start recording'),
         this.player.emit(F.recordStart),
-        (this.recordingInterval = window.setInterval(
-          () => {
-            ((this.recordingTimestamp += 1),
-              this.player.emit(F.recordingTimestamp, this.recordingTimestamp));
-          },
-          1e3,
-        )));
+        (this.recordingInterval = window.setInterval(() => {
+          ((this.recordingTimestamp += 1),
+            this.player.emit(F.recordingTimestamp, this.recordingTimestamp));
+        }, 1e3)));
     }
     stopRecordAndSave() {
       this.recorder &&
@@ -5612,18 +5564,15 @@
           Te() &&
             t.$controls &&
             e._opt.useWebFullScreen &&
-            setTimeout(
-              () => {
-                if (e.fullscreen) {
-                  let i = e.height / 2 - e.width + 19,
-                    o = e.height / 2 - 19;
-                  t.$controls.style.transform = `translateX(${-i}px) translateY(-${o}px) rotate(-90deg)`;
-                } else
-                  t.$controls.style.transform =
-                    'translateX(0) translateY(0) rotate(0)';
-              },
-              10,
-            );
+            setTimeout(() => {
+              if (e.fullscreen) {
+                let i = e.height / 2 - e.width + 19,
+                  o = e.height / 2 - 19;
+                t.$controls.style.transform = `translateX(${-i}px) translateY(-${o}px) rotate(-90deg)`;
+              } else
+                t.$controls.style.transform =
+                  'translateX(0) translateY(0) rotate(0)';
+            }, 10);
         };
       try {
         (ye.on('change', a),
@@ -5822,12 +5771,9 @@
                 : (t.isFocus = !1);
             }),
             i(window, 'orientationchange', () => {
-              setTimeout(
-                () => {
-                  e.resize();
-                },
-                300,
-              );
+              setTimeout(() => {
+                e.resize();
+              }, 300);
             }),
             i(t.$controls, 'click', (e) => {
               e.stopPropagation();
@@ -5912,12 +5858,9 @@
             let o = null;
             const r = () => {
                 (s(),
-                  (o = setTimeout(
-                    () => {
-                      Be(t.$controls, 'display', 'none');
-                    },
-                    5e3,
-                  )));
+                  (o = setTimeout(() => {
+                    Be(t.$controls, 'display', 'none');
+                  }, 5e3)));
               },
               s = () => {
                 o && (clearTimeout(o), (o = null));
@@ -7195,14 +7138,11 @@
       if (yt())
         return (
           this.disable(),
-          (this.noSleepTimer = window.setInterval(
-            () => {
-              document.hidden ||
-                ((window.location.href = window.location.href.split('#')[0]),
-                window.setTimeout(window.stop, 0));
-            },
-            15e3,
-          )),
+          (this.noSleepTimer = window.setInterval(() => {
+            document.hidden ||
+              ((window.location.href = window.location.href.split('#')[0]),
+              window.setTimeout(window.stop, 0));
+          }, 15e3)),
           (this.enabled = !0),
           Promise.resolve()
         );
@@ -7498,12 +7438,9 @@
     set fullscreen(e) {
       Te() && this._opt.useWebFullScreen
         ? (this.emit(F.webFullscreen, e),
-          setTimeout(
-            () => {
-              (this.updateOption({ rotate: e ? 270 : 0 }), this.resize());
-            },
-            10,
-          ))
+          setTimeout(() => {
+            (this.updateOption({ rotate: e ? 270 : 0 }), this.resize());
+          }, 10))
         : this.emit(F.fullscreen, e);
     }
     get fullscreen() {
@@ -7720,12 +7657,9 @@
             videoTimestamp: '',
             allTimestamp: '',
           }),
-          setTimeout(
-            () => {
-              e();
-            },
-            0,
-          ));
+          setTimeout(() => {
+            e();
+          }, 0));
       });
     }
     pause() {
@@ -7770,26 +7704,20 @@
       (this.clearCheckHeartTimeout(), this.checkHeartTimeout());
     }
     checkHeartTimeout() {
-      this._checkHeartTimeout = setTimeout(
-        () => {
-          if (this.playing) {
-            if (0 !== this._stats.fps) return;
-            if (this.isDestroyedOrClosed()) return;
-            this.pause().then(() => {
-              (this.emit(F.timeout, F.delayTimeout), this.emit(F.delayTimeout));
-            });
-          }
-        },
-        1e3 * this._opt.heartTimeout,
-      );
+      this._checkHeartTimeout = setTimeout(() => {
+        if (this.playing) {
+          if (0 !== this._stats.fps) return;
+          if (this.isDestroyedOrClosed()) return;
+          this.pause().then(() => {
+            (this.emit(F.timeout, F.delayTimeout), this.emit(F.delayTimeout));
+          });
+        }
+      }, 1e3 * this._opt.heartTimeout);
     }
     checkStatsInterval() {
-      this._checkStatsInterval = setInterval(
-        () => {
-          this.updateStats();
-        },
-        1e3,
-      );
+      this._checkStatsInterval = setInterval(() => {
+        this.updateStats();
+      }, 1e3);
     }
     clearCheckHeartTimeout() {
       this._checkHeartTimeout &&
@@ -7803,17 +7731,14 @@
         'Player',
         `checkLoadingTimeout loadingTimeout is ${this._opt.loadingTimeout} and newLoadingTimeout is ${t}`,
       ),
-        (this._checkLoadingTimeout = setTimeout(
-          () => {
-            this.playing ||
-              this.isDestroyedOrClosed() ||
-              this.pause().then(() => {
-                (this.emit(F.timeout, F.loadingTimeout),
-                  this.emit(F.loadingTimeout));
-              });
-          },
-          1e3 * t,
-        )));
+        (this._checkLoadingTimeout = setTimeout(() => {
+          this.playing ||
+            this.isDestroyedOrClosed() ||
+            this.pause().then(() => {
+              (this.emit(F.timeout, F.loadingTimeout),
+                this.emit(F.loadingTimeout));
+            });
+        }, 1e3 * t)));
     }
     clearCheckLoadingTimeout() {
       this._checkLoadingTimeout &&
@@ -8699,12 +8624,9 @@
     }
     _checkInitDecoderWorkerTimeout() {
       (this._clearInitDecoderWorkerTimeout(),
-        (this.initDecoderWorkerTimeout = setTimeout(
-          () => {
-            this._handleInitDecoderWorkerTimeout();
-          },
-          1e3 * this.player._opt.loadingDecoderWorkerTimeout,
-        )));
+        (this.initDecoderWorkerTimeout = setTimeout(() => {
+          this._handleInitDecoderWorkerTimeout();
+        }, 1e3 * this.player._opt.loadingDecoderWorkerTimeout)));
     }
     _handleInitDecoderWorkerTimeout() {
       this.pause()

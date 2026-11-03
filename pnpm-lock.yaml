@@ -1067,15 +1067,6 @@ importers:
       '@vben-core/shared':
         specifier: workspace:*
         version: link:../../packages/@core/base/shared
-      '@vben-core/typings':
-        specifier: workspace:*
-        version: link:../../packages/@core/base/typings
-      '@vben/types':
-        specifier: workspace:*
-        version: link:../../packages/types
-      '@vben/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
       vue:
         specifier: 3.5.41
         version: 3.5.41(typescript@6.0.3)
@@ -2155,6 +2146,9 @@ importers:
       '@vben/constants':
         specifier: workspace:*
         version: link:../packages/constants
+      '@vben/easy-player':
+        specifier: workspace:*
+        version: link:../external/easy-player
       '@vben/hooks':
         specifier: workspace:*
         version: link:../packages/effects/hooks

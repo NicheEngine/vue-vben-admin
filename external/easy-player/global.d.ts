@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
+
+import 'vue';
+
 /**
  * EasyPlayer 全局组件类型声明
- *
- * 说明：@easydarwin/easyplayer 通过全局 script 引入（EasyPlayer-lib.min.js），
- * 注册为自定义元素 <easy-player>，Vue 模板中使用时需要声明类型。
  */
 declare module 'vue' {
   export interface GlobalComponents {

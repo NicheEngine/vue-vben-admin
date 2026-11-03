@@ -37,6 +37,7 @@
     "@vben/access": "workspace:*",
     "@vben/common-ui": "workspace:*",
     "@vben/constants": "workspace:*",
+    "@vben/easy-player": "workspace:*",
     "@vben/hooks": "workspace:*",
     "@vben/icons": "workspace:*",
     "@vben/jessibuca-player": "workspace:*",

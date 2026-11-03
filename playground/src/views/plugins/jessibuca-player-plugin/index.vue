@@ -363,10 +363,8 @@ onBeforeUnmount(() => {
       description="请确认静态资源加载。"
     >
       <template #action>
-<Button size="small" @click="recheckJessibuca">
-重新检测
-</Button>
-</template>
+        <Button size="small" @click="recheckJessibuca"> 重新检测 </Button>
+      </template>
     </Alert>
 
     <Alert
@@ -489,9 +487,9 @@ onBeforeUnmount(() => {
                 fixedHeight = 720;
               }
             "
-            >
-1280 × 720
-</Button>
+          >
+            1280 × 720
+          </Button>
           <Button
             size="small"
             @click="
@@ -500,9 +498,9 @@ onBeforeUnmount(() => {
                 fixedHeight = 1080;
               }
             "
-            >
-1920 × 1080
-</Button>
+          >
+            1920 × 1080
+          </Button>
         </div>
 
         <div
@@ -527,10 +525,8 @@ onBeforeUnmount(() => {
       <Card class="mb-4" title="播放控制">
         <div class="flex flex-wrap items-center gap-3">
           <Button @click="handleToggle">
-{{
-            player.isPlaying.value && !isCleared ? '暂停' : '播放'
-          }}
-</Button>
+            {{ player.isPlaying.value && !isCleared ? '暂停' : '播放' }}
+          </Button>
           <Button @click="handleReload">重新加载</Button>
           <Button @click="handleFullscreen">全屏播放</Button>
           <Button @click="handleClear">清除画面</Button>
