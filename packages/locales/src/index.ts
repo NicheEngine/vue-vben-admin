@@ -6,9 +6,9 @@ import {
   setupI18n,
 } from './i18n';
 
-const $t = i18n.global.t;
-const $te = i18n.global.te;
-const $locale = i18n.global.locale;
+const $t = i18n.global.t.bind(i18n.global);
+const $te = i18n.global.te.bind(i18n.global);
+const $locale = i18n.global.locale.bind(i18n.global);
 
 export {
   $locale,
