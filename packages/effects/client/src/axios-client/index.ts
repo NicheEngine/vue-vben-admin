@@ -35,7 +35,12 @@ function urlParams(baseUrl: string, obj: any): string {
     ? `${baseUrl}&${parameters}`
     : baseUrl.replace(/\/?$/, '?') + parameters;
 }
-
+function joinTimestamp(join: boolean, timeSign: string, restful: true): string;
+function joinTimestamp(
+  join: boolean,
+  timeSign: string,
+  restful?: false,
+): object;
 function joinTimestamp(
   join: boolean,
   timeSign: string,
@@ -270,7 +275,7 @@ const handler: AxiosHandler = {
       options.headers = {} as AxiosRequestHeaders;
     }
     options.headers['Accept-Language'] = $locale.value;
-    return options as InternalAxiosRequestConfig;
+    return options;
   },
 
   afterRequestErrorHandler: async (axiosObject: AxiosObject, error: any) => {

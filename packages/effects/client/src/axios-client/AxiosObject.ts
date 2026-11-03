@@ -214,6 +214,11 @@ class AxiosObject {
       });
     }
 
+    const rawHeaders = config?.headers;
+    const normalizedHeaders: Record<string, string> =
+      rawHeaders instanceof Headers
+        ? Object.fromEntries(rawHeaders.entries())
+        : { ...(rawHeaders as Record<string, string> | undefined) };
     return this.instance.request<T>({
       ...config,
       method: 'POST',
@@ -221,7 +226,7 @@ class AxiosObject {
       headers: {
         'Content-type': 'multipart/form-data;charset=utf-8',
         ignoreCancelToken: true,
-        ...config?.headers,
+        ...normalizedHeaders,
       },
     });
   }

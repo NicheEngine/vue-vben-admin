@@ -208,7 +208,7 @@ async function loadApplicationPlugins(
         headScripts,
         links,
       },
-    } as InjectDependPluginOptions;
+    };
   }
 
   const commonPlugins = await loadCommonPlugins(commonOptions);

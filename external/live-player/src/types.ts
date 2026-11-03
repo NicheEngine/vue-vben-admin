@@ -36,6 +36,19 @@ export interface LivePlayerProps {
   mpegtsMaxRetry?: number;
 }
 
+export interface LivePlayerStats {
+  /** 缓冲延迟 (ms) */
+  buf?: number;
+  /** 帧率 */
+  fps?: number;
+  /** 音频码率 (bps) */
+  abps?: number;
+  /** 视频码率 (bps) */
+  vbps?: number;
+  /** 时间戳 */
+  ts?: number;
+}
+
 /** 播放器内部状态（运行时可写） */
 export interface LivePlayerState {
   currentTime: number;
@@ -47,7 +60,7 @@ export interface LivePlayerState {
   videoWidth: number;
   videoHeight: number;
   networkDelay: number;
-  stats: any | null;
+  stats: LivePlayerStats | null;
 }
 
 export type LivePlayerStoreState = LivePlayerProps & LivePlayerState;

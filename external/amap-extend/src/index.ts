@@ -17,8 +17,19 @@ function canvas2dPerformancePatch(): void {
   const proto = HTMLCanvasElement.prototype as any;
   if (proto[PATCHED]) return;
 
-  const originalGetContext: HTMLCanvasElement['getContext'] =
-    HTMLCanvasElement.prototype.getContext;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    HTMLCanvasElement.prototype,
+    'getContext',
+  );
+  if (!descriptor || typeof descriptor.value !== 'function') {
+    return;
+  }
+
+  const originalGetContext = descriptor.value as (
+    this: HTMLCanvasElement,
+    contextId: string,
+    options?: any,
+  ) => null | RenderingContext;
 
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     configurable: true,

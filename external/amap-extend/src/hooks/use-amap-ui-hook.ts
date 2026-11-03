@@ -5,7 +5,7 @@ interface AreaNode {
 }
 
 export const useAMapUiHook = () => {
-  const districtExplorer = ref<any>();
+  const districtExplorer = ref();
   const parentGeojson = ref<any[]>([]);
   const areaGeojson = ref<any[]>([]);
   const regionGeojson = ref<any[]>([]);

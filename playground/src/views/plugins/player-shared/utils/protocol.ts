@@ -143,11 +143,7 @@ export async function probeUrl(url: string): Promise<ProbeResult> {
     const isFlv = protocol.includes('flv');
     const isHls = protocol === 'hls';
 
-    try {
-      resp.body?.cancel();
-    } catch {
-      /* ignore */
-    }
+    void resp.body?.cancel();
 
     const mismatch =
       (isFlv &&

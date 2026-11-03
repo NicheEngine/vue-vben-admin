@@ -305,7 +305,7 @@ export class OssrsPlayerApi {
       };
 
       if ('play' in p) {
-        await (p as SrsRtcPlayer | SrsRtcWhipWhep).play(targetUrl);
+        await p.play(targetUrl);
       }
     } catch (error: any) {
       if (token !== this.playToken) return;
@@ -355,7 +355,7 @@ export class OssrsPlayerApi {
     }
   }
 
-  private dispatch<K extends keyof OssrsCallbacks>(key: K, ...args: any[]) {
+  private dispatch(key: keyof OssrsCallbacks, ...args: any[]) {
     (this.callbacks[key] as any)?.(...args);
     (this.componentCallbacks[key] as any)?.(...args);
   }

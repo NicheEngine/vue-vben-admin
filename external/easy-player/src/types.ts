@@ -34,7 +34,7 @@ export interface EasyPlayerProps {
   recordMaxFileSize?: number;
   remoteHost?: string;
   resolution?: string;
-  resolutionDefault?: EasyResolution | string;
+  resolutionDefault?: EasyResolution;
   restartTime?: number;
   scaleMode?: 0 | 1 | 2;
   /** 离屏继续播放（拦截滚动触发的自动暂停），默认 false */
@@ -88,7 +88,7 @@ export interface EasyPlayerInstance {
   pause?: () => void;
   play?: () => void;
   restartPlayer?: () => void;
-  snapshot?: () => Promise<unknown> | unknown;
+  snapshot?: () => unknown;
   switchAudio?: () => void;
   switchRecording?: () => void;
   switchVideo?: () => void;

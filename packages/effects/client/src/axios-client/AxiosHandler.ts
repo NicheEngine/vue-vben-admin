@@ -32,9 +32,9 @@ interface AxiosHandler {
     options: InternalAxiosRequestConfig,
   ) => InternalAxiosRequestConfig;
   doResponseHandler?: (
-    config: AxiosHttpRequestConfig<any>,
-    response: AxiosResponse<any>,
-  ) => AxiosResponse<any>;
+    config: AxiosHttpRequestConfig,
+    response: AxiosResponse,
+  ) => AxiosResponse;
 }
 
 export type { AxiosHandler };

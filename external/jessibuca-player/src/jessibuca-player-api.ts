@@ -474,7 +474,7 @@ export class JessibucaPlayerApi {
         this.dispatch('onStats', stats);
       },
       error: (error: Error | string) => {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : error;
         this.setError(message);
       },
       timeout: (error: string) => {

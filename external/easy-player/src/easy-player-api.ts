@@ -59,7 +59,7 @@ function createDefaultState(): EasyPlayerStoreState {
     videoWidth: 0,
     volume: 1,
     watermark: undefined,
-  } as EasyPlayerStoreState;
+  };
 }
 
 export class EasyPlayerApi {

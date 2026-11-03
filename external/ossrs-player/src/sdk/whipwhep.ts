@@ -67,7 +67,7 @@ class SrsRtcWhipWhepAsyncImpl implements SrsRtcWhipWhep {
     }
 
     pc.getSenders().forEach((s) => {
-      if (s.track) s.replaceTrack(null);
+      if (s.track) void s.replaceTrack(null);
     });
 
     const mediaStream = await navigator.mediaDevices.getUserMedia(

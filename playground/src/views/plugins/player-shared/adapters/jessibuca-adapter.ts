@@ -9,7 +9,7 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
   const isLoading = ref(api.store.state.isLoading ?? false);
   const volume = ref(api.store.state.volume ?? 1);
   const isMuted = ref(api.store.state.isMuted ?? true);
-  const scaleMode = ref((api.store.state.config.scaleMode ?? 1) as 0 | 1 | 2);
+  const scaleMode = ref(api.store.state.config.scaleMode ?? 1);
 
   const isRecording = ref(false);
   const recordingDuration = ref(0);
@@ -69,7 +69,7 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
     isPlaying.value = state.isPlaying;
     volume.value = state.volume;
     isMuted.value = state.isMuted;
-    scaleMode.value = (state.config.scaleMode ?? 1) as 0 | 1 | 2;
+    scaleMode.value = state.config.scaleMode ?? 1;
     if (state.isLoading !== undefined) {
       isLoading.value = state.isLoading;
     }

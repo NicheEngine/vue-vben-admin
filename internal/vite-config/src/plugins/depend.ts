@@ -8,7 +8,7 @@ import { colors, readPackageJSON } from '@vben/node-utils';
 
 interface PluginOptions {
   depends: Record<DependTypes, () => void>;
-  root: string;
+  root?: string;
 }
 
 /**
@@ -45,7 +45,9 @@ const appDependScriptsHandle = (depends: Record<DependTypes, () => void>) => {
         );
       } catch (scriptError) {
         console.log(
-          `\n✨ ${colors.cyan(`[${depend}]`)} ${colors.red(`\nscript run with error: \n'${scriptError}`)}`,
+          `\n✨ ${colors.cyan(`[${depend}]`)} ${colors.red(
+            `\nscript run with error: \n'${String(scriptError)}`,
+          )}`,
         );
       }
     }

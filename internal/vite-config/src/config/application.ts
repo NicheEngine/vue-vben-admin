@@ -1,7 +1,5 @@
 import type { CSSOptions, UserConfig } from 'vite';
 
-import type { DependOptions } from '@vben/depend-config';
-
 import type { DefineApplicationOptions } from '../typing';
 
 import path, { relative } from 'node:path';
@@ -44,7 +42,7 @@ function defineApplicationConfig(userConfigPromise?: DefineApplicationOptions) {
           cesium: false,
           easyplayer: false,
           tianditu: false,
-        } as DependOptions,
+        },
       },
       html: true,
       i18n: true,

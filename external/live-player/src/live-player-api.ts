@@ -248,9 +248,10 @@ export class LivePlayerApi {
     }));
   }
 
-  private emitUser<
-    K extends keyof Omit<LivePlayerApiOptions, keyof LivePlayerStoreState>,
-  >(key: K, ...args: any[]) {
+  private emitUser(
+    key: keyof Omit<LivePlayerApiOptions, keyof LivePlayerStoreState>,
+    ...args: any[]
+  ) {
     (this.userCallbacks[key] as any)?.(...args);
     (this.componentCallbacks[key] as any)?.(...args);
   }

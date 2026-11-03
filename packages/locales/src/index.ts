@@ -8,7 +8,7 @@ import {
 
 const $t = i18n.global.t.bind(i18n.global);
 const $te = i18n.global.te.bind(i18n.global);
-const $locale = i18n.global.locale.bind(i18n.global);
+const $locale = i18n.global.locale;
 
 export {
   $locale,

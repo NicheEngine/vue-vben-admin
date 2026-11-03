@@ -35,7 +35,7 @@ export interface InjectDependPluginOptions {
 
 const wrapContent = (
   script: any,
-  injectTo: ('body' | 'body-prepend' | 'head' | 'head-prepend') & string,
+  injectTo: HtmlTagDescriptor['injectTo'],
 ): HtmlTagDescriptor => {
   let result: HtmlTagDescriptor;
   if (typeof script === 'object' && script?.src) {
@@ -112,7 +112,7 @@ const transformHtmlHandler = async (
     htmlResult.push({
       tag: 'style',
       injectTo: 'head',
-      children: `${style}`
+      children: style
         .split('\n')
         .map((line) => `  ${line}`)
         .join('\n'),
@@ -156,10 +156,7 @@ async function viteInjectDependPlugin(
 ): Promise<PluginOption | undefined> {
   const pagesOptions = htmlOptions.pages;
   const indexOptions = htmlOptions.index;
-  let pluginOptions: Record<string, InjectDependOptions> = {} as Record<
-    string,
-    InjectDependOptions
-  >;
+  let pluginOptions: Record<string, InjectDependOptions> = {};
   if (pagesOptions) {
     pluginOptions = pagesOptions;
   } else if (indexOptions) {
@@ -179,7 +176,7 @@ async function viteInjectDependPlugin(
       const htmlKey: string = matchHtmlKey(htmlPath);
       const options: InjectDependOptions = pluginOptions[htmlKey] || {};
       if (!options || Object.entries(pluginOptions).length === 0) {
-        return;
+        return { html, tags: [] };
       }
       return await transformHtmlHandler(html, options);
     },

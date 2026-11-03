@@ -176,7 +176,7 @@ export function createOssrsAdapter(
         stopStats();
         return;
       }
-      api.play(u, defaultProtocol);
+      void api.play(u, defaultProtocol);
     },
 
     screenshot: (opts) => {

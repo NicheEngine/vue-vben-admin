@@ -49,7 +49,7 @@ class SrsRtcPublisherAsyncImpl implements SrsRtcPublisher {
 
     // 清理残留 sender，避免 pc 复用时叠加
     pc.getSenders().forEach((s) => {
-      if (s.track) s.replaceTrack(null);
+      if (s.track) void s.replaceTrack(null);
     });
 
     const mediaStream = await navigator.mediaDevices.getUserMedia(
