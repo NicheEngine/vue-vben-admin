@@ -1,3 +1,5 @@
+import type { DependConfigOptions } from './index';
+
 import { copyFile } from '@vben/node-utils';
 
 const CESIUM_PATH = 'node_modules/cesium/Build/CesiumUnminified';
@@ -9,9 +11,7 @@ const targets = {
   files: ['Cesium.js'],
 } as const;
 
-export const runCesiumScript = (
-  options?: boolean | { source?: string; target?: string },
-) => {
+export const runCesiumScript = (options?: boolean | DependConfigOptions) => {
   if (options === false) {
     return;
   }

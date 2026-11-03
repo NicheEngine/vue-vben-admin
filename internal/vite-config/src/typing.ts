@@ -380,27 +380,37 @@ type ApplicationOptions = ApplicationPluginOptions;
  */
 type LibraryOptions = LibraryPluginOptions;
 
-/**
- * 应用配置定义函数类型
- * @description 用于定义应用构建配置
- */
-type DefineApplicationOptions = (config?: ConfigEnv) => Promise<{
+/** 应用配置函数的返回结构 */
+interface ApplicationConfigOptions {
   /** 应用插件配置 */
   application?: ApplicationOptions;
   /** Vite 配置 */
   vite?: UserConfig;
-}>;
+}
+
+/** 库配置函数的返回结构 */
+interface LibraryConfigOptions {
+  /** 库插件配置 */
+  library?: LibraryOptions;
+  /** Vite 配置 */
+  vite?: UserConfig;
+}
+
+/**
+ * 应用配置定义函数类型
+ * @description 用于定义应用构建配置
+ */
+type DefineApplicationOptions = (
+  config?: ConfigEnv,
+) => Promise<ApplicationConfigOptions>;
 
 /**
  * 库配置定义函数类型
  * @description 用于定义库构建配置
  */
-type DefineLibraryOptions = (config?: ConfigEnv) => Promise<{
-  /** 库插件配置 */
-  library?: LibraryOptions;
-  /** Vite 配置 */
-  vite?: UserConfig;
-}>;
+type DefineLibraryOptions = (
+  config?: ConfigEnv,
+) => Promise<LibraryConfigOptions>;
 
 /**
  * 配置定义类型
@@ -411,6 +421,7 @@ type DefineConfig = DefineApplicationOptions | DefineLibraryOptions;
 type VbenViteConfig = Promise<UserConfig> | UserConfig | UserConfigFnPromise;
 
 export type {
+  ApplicationConfigOptions,
   ApplicationPluginOptions,
   ArchiverPluginOptions,
   CommonPluginOptions,
@@ -424,6 +435,7 @@ export type {
   HtmlPluginOptions,
   IImportMap,
   ImportmapPluginOptions,
+  LibraryConfigOptions,
   LibraryPluginOptions,
   NitroMockPluginOptions,
   PrintPluginOptions,

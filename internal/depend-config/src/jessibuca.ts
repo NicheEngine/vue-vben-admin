@@ -1,3 +1,5 @@
+import type { DependConfigOptions } from './index';
+
 import { copyFile } from '@vben/node-utils';
 
 const JESSIBUCA_PATH = 'libraries/jessibuca';
@@ -8,9 +10,7 @@ const targets = {
   files: ['decoder.js', 'jessibuca.js', 'decoder.wasm'],
 } as const;
 
-export const runJessibucaScript = (
-  options?: boolean | { source?: string; target?: string },
-) => {
+export const runJessibucaScript = (options?: boolean | DependConfigOptions) => {
   if (options === false) {
     return;
   }

@@ -1,10 +1,12 @@
 import type { UserConfig } from 'vite';
 
+import type { ApplicationConfigOptions } from '@vben/vite-config';
+
 import { defineConfig } from '@vben/vite-config';
 
 import serverProxies from './proxies.config';
 
-export default defineConfig(async () => {
+export default defineConfig(async (): Promise<ApplicationConfigOptions> => {
   return {
     application: {
       serverProxies,

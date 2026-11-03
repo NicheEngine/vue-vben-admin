@@ -17,9 +17,9 @@ export const DEPEND_KEYS = [
 
 export type DependTypes = (typeof DEPEND_KEYS)[number];
 
-export type DependOptions = {
-  [K in DependTypes]?: boolean | DependConfigOptions;
-};
+export type DependOptions = Partial<
+  Record<DependTypes, boolean | DependConfigOptions>
+>;
 
 export const viteDepends: Record<
   DependTypes,
