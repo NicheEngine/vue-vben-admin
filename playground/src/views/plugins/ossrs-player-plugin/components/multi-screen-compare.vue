@@ -8,12 +8,18 @@ import { useOssrsPlayer } from '@vben/ossrs-player';
 import { Card } from 'antdv-next';
 
 import { createOssrsAdapter } from '../../player-shared';
-const props = defineProps<{
-  url: string;
-  // width: number | string;
-  height: number | string;
-  protocol?: 'rtc' | 'whep';
-}>();
+const props = withDefaults(
+  defineProps<{
+    url: string;
+    width?: number | string;
+    height: number | string;
+    protocol?: 'rtc' | 'whep';
+  }>(),
+  {
+    protocol: 'rtc',
+    width: '100%',
+  },
+);
 
 const modes = [
   { mode: 0 as const, label: '拉伸填满', fit: 'fill' as OssrsObjectFit },
@@ -70,7 +76,10 @@ onBeforeUnmount(() => {
         v-for="(p, index) in players"
         :key="p.mode"
         class="flex flex-col gap-2 shrink-0"
-        :style="{ width: `${width}px` }"
+        :style="{
+          width:
+            typeof props.width === 'number' ? `${props.width}px` : props.width,
+        }"
       >
         <div class="text-sm text-foreground/70">{{ p.label }}</div>
         <div
