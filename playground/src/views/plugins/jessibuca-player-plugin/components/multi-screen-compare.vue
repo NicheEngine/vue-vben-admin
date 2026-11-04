@@ -5,31 +5,36 @@ import { useJessibucaPlayer } from '@vben/jessibuca-player';
 
 import { Card } from 'antdv-next';
 
-const props = defineProps<{
-  url: string;
-  width: number;
-  height: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    url: string;
+    width?: number | string;
+    height: number | string;
+  }>(),
+  {
+    width: '100%',
+  },
+);
 
 const modes = [
-  { mode: 0 as const, label: '拉伸填满' },
-  { mode: 1 as const, label: '等比留黑边' },
-  { mode: 2 as const, label: '等比裁切' },
-];
+  { mode: 0, label: '拉伸填满', scaleMode: 0 },
+  { mode: 1, label: '等比留黑边', scaleMode: 1 },
+  { mode: 2, label: '等比裁切', scaleMode: 2 },
+] as const;
 
-const players = modes.map(({ mode, label }) => {
+const players = modes.map(({ mode, label, scaleMode }) => {
   const [Player, api] = useJessibucaPlayer({
     config: {
       autoPlay: true,
       isMute: true,
       decoder: '/jessibuca/decoder.js',
-      scaleMode: mode,
+      scaleMode,
       isResize: true,
       supportDblclickFullscreen: false,
       useWebFullScreen: false,
       enableRecording: false,
       debug: false,
-      forceNoOffscreen: true, // 必须：防止 WebGL 多实例上下文丢失
+      forceNoOffscreen: true,
     },
   });
 
@@ -46,11 +51,9 @@ onMounted(() => {
     }, 300),
     setTimeout(() => {
       renderStates.value[1] = true;
-      timers.push(setTimeout(() => players[1]?.api?.resize?.(), 500));
     }, 1500),
     setTimeout(() => {
       renderStates.value[2] = true;
-      timers.push(setTimeout(() => players[2]?.api?.resize?.(), 500));
     }, 3000),
   );
 });
@@ -68,26 +71,39 @@ onBeforeUnmount(() => {
     <div class="mb-3 text-xs text-foreground/60">
       同一路流，三种缩放模式并排对比。容器尺寸：{{ width }} × {{ height }}。
     </div>
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div class="grid grid-cols-3 gap-4">
       <div
         v-for="(p, index) in players"
         :key="p.mode"
-        class="flex flex-col gap-2"
+        class="flex flex-col gap-2 min-w-0"
+        :style="{
+          width:
+            typeof props.width === 'number' ? `${props.width}px` : props.width,
+        }"
       >
         <div class="text-sm text-foreground/70">{{ p.label }}</div>
         <div
-          class="relative overflow-hidden rounded border border-border bg-black flex items-center justify-center"
-          :style="{ width: `${width}px`, height: `${height}px` }"
+          class="relative overflow-hidden rounded border border-border bg-black flex items-center justify-center w-full"
+          :style="{
+            height:
+              typeof props.height === 'number'
+                ? `${props.height}px`
+                : props.height,
+          }"
         >
-          <template v-if="renderStates[index]">
-            <component
-              :is="p.Player"
-              :api="p.api"
-              :url="props.url"
-              class="h-full w-full"
-            />
+          <template v-if="renderStates[index] && props.url">
+            <div class="absolute inset-0">
+              <component
+                :is="p.Player"
+                :api="p.api"
+                :url="props.url"
+                class="h-full w-full"
+              />
+            </div>
           </template>
-          <span v-else class="text-xs text-foreground/40">等待解码器资源释放...</span>
+          <span v-else class="text-xs text-foreground/40 text-center px-2">
+            等待解码器调度...
+          </span>
         </div>
       </div>
     </div>

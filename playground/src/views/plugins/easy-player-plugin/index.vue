@@ -583,8 +583,7 @@ onBeforeUnmount(() => {
         <MultiScreenCompare
           v-if="showMultiScreen"
           :url="currentUrl"
-          :width="320"
-          :height="180"
+          :height="300"
         />
       </Card>
     </template>

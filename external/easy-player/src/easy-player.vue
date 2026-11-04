@@ -34,7 +34,7 @@ const props = withDefaults(
     resolutionDefault?: string;
     restartTime?: number;
     scaleMode?: 0 | 1 | 2;
-    keepPlayingOffscreen?: boolean; // ✅ 新增
+    keepPlayingOffscreen?: boolean;
     showEnterprise?: boolean;
     showCustomButton?: boolean;
     videoTitle?: string;
@@ -129,7 +129,11 @@ watch(
 );
 watch(
   () => props.scaleMode,
-  (mode: 0 | 1 | 2) => api.setScaleMode(mode),
+  (mode) => {
+    if (mode !== undefined) {
+      api.setScaleMode(mode);
+    }
+  },
 );
 watch(
   () => props.keepPlayingOffscreen,
@@ -385,7 +389,7 @@ onBeforeUnmount(() => {
 
 defineExpose({
   api,
-  resize: () => api.setScaleMode(api.store.state.scaleMode),
+  resize: () => api.setScaleMode(api.store.state.scaleMode ?? 1),
 });
 </script>
 

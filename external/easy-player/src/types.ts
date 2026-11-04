@@ -57,7 +57,6 @@ export interface EasyPlayerState {
   volume: number;
   videoWidth: number;
   videoHeight: number;
-  scaleMode: 0 | 1 | 2;
   keepPlayingOffscreen: boolean;
 }
 

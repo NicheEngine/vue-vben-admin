@@ -368,7 +368,7 @@ export class EasyPlayerApi {
 
   private applyFit() {
     if (!this.containerEl) return;
-    const { scaleMode } = this.store.state;
+    const scaleMode = this.store.state.scaleMode ?? 1;
 
     let fit = 'contain';
     if (scaleMode === 0) fit = 'fill';
@@ -419,7 +419,7 @@ export class EasyPlayerApi {
         '.video-js',
       ) as HTMLElement;
 
-      const { scaleMode } = this.store.state;
+      const scaleMode = this.store.state.scaleMode ?? 1;
       let targetFit = fitStr;
       if (!targetFit) {
         if (scaleMode === 0) targetFit = 'fill';

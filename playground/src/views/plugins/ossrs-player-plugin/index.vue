@@ -21,6 +21,7 @@ import {
 
 import {
   createOssrsAdapter,
+  detectOssrsProtocol,
   NetworkChart,
   PlayStatusPanel,
   ProtocolDetect,
@@ -75,13 +76,9 @@ const muted = api.useSelector((s: any) => s.muted);
 
 const effectiveType = computed(() => {
   if (!currentUrl.value) return '-';
-  const lower = currentUrl.value.toLowerCase();
-  if (lower.includes('/whep/') || lower.includes('/whip-play/')) {
-    return 'WHEP';
-  }
-  if (lower.startsWith('webrtc://') || lower.startsWith('rtc://')) {
-    return 'SRS RTC';
-  }
+  const proto = detectOssrsProtocol(currentUrl.value);
+  if (proto === 'whep') return 'WHEP';
+  if (proto === 'rtc') return 'SRS RTC';
   return '未知';
 });
 
@@ -155,14 +152,9 @@ function applyUrl(u?: string) {
   const value = (u ?? inputUrl.value).trim();
   if (!value) return;
 
-  const lower = value.toLowerCase();
-  if (lower.includes('/whep/') && config.protocol !== 'whep') {
-    config.protocol = 'whep';
-  } else if (
-    (lower.startsWith('webrtc://') || lower.startsWith('rtc://')) &&
-    config.protocol !== 'rtc'
-  ) {
-    config.protocol = 'rtc';
+  const detectedProtocol = detectOssrsProtocol(value);
+  if (detectedProtocol !== 'unknown' && config.protocol !== detectedProtocol) {
+    config.protocol = detectedProtocol;
   }
 
   isCleared.value = false;

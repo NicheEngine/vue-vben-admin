@@ -102,6 +102,12 @@ async function createInstance() {
   }) as unknown as JessibucaInstance;
 
   api.bindInstance(instance);
+
+  const initialScaleMode = api.store.state.config.scaleMode;
+  if (initialScaleMode !== undefined) {
+    instance.setScaleMode(initialScaleMode);
+  }
+
   api.clearRebuildFlag();
 }
 

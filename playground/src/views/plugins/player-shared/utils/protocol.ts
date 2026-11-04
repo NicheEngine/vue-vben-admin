@@ -166,3 +166,23 @@ export async function probeUrl(url: string): Promise<ProbeResult> {
     clearTimeout(timer);
   }
 }
+
+/**
+ * 专门用于探测 OSSRS 的 RTC/WHEP 协议
+ */
+export function detectOssrsProtocol(url: string): 'rtc' | 'unknown' | 'whep' {
+  if (!url) return 'unknown';
+  const lower = url.toLowerCase();
+
+  // 命中 WHEP 特征
+  if (lower.includes('/whep/') || lower.includes('/whip-play/')) {
+    return 'whep';
+  }
+
+  // 命中 SRS RTC 特征
+  if (lower.startsWith('webrtc://') || lower.startsWith('rtc://')) {
+    return 'rtc';
+  }
+
+  return 'unknown';
+}

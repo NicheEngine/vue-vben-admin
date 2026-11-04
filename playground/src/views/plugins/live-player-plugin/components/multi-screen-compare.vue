@@ -7,18 +7,24 @@ import { useLivePlayer } from '@vben/live-player';
 
 import { Card } from 'antdv-next';
 
-const props = defineProps<{
-  url: string;
-  width: number;
-  height: number;
-  type?: any;
-}>();
+const props = withDefaults(
+  defineProps<{
+    url: string;
+    width?: number | string;
+    height: number | string;
+    type?: any;
+  }>(),
+  {
+    width: '100%',
+    type: undefined,
+  },
+);
 
 const modes = [
-  { mode: 0 as const, label: '拉伸填满', fit: 'fill' as LiveObjectFit },
-  { mode: 1 as const, label: '等比留黑边', fit: 'contain' as LiveObjectFit },
-  { mode: 2 as const, label: '等比裁切', fit: 'cover' as LiveObjectFit },
-];
+  { mode: 0, label: '拉伸填满', fit: 'fill' as LiveObjectFit },
+  { mode: 1, label: '等比留黑边', fit: 'contain' as LiveObjectFit },
+  { mode: 2, label: '等比裁切', fit: 'cover' as LiveObjectFit },
+] as const;
 
 const players = modes.map(({ mode, label, fit }) => {
   const [Player, api] = useLivePlayer({
@@ -30,7 +36,6 @@ const players = modes.map(({ mode, label, fit }) => {
   return { Player, api, mode, label, fit };
 });
 
-// 错峰挂载机制
 const renderStates = ref<boolean[]>([false, false, false]);
 const timers: Array<ReturnType<typeof setTimeout>> = [];
 
@@ -41,15 +46,14 @@ onMounted(() => {
     }, 300),
     setTimeout(() => {
       renderStates.value[1] = true;
-    }, 1500),
+    }, 1000),
     setTimeout(() => {
       renderStates.value[2] = true;
-    }, 3000),
+    }, 1800),
   );
 });
 
 onBeforeUnmount(() => {
-  // 组件销毁前清理所有定时器
   timers.forEach((t) => clearTimeout(t));
   players.forEach((p) => {
     void p.api.destroy();
@@ -62,28 +66,36 @@ onBeforeUnmount(() => {
     <div class="mb-3 text-xs text-foreground/60">
       同一路流，三种缩放模式并排对比。容器尺寸：{{ width }} × {{ height }}。
     </div>
-    <div class="flex flex-wrap gap-4">
+    <div class="grid grid-cols-3 gap-4">
       <div
         v-for="(p, index) in players"
         :key="p.mode"
         class="flex flex-col gap-2 shrink-0"
-        :style="{ width: `${width}px` }"
+        :style="{
+          width:
+            typeof props.width === 'number' ? `${props.width}px` : props.width,
+        }"
       >
         <div class="text-sm text-foreground/70">{{ p.label }}</div>
         <div
-          class="relative overflow-hidden rounded border border-border bg-black flex items-center justify-center"
-          :style="{ width: `${width}px`, height: `${height}px` }"
+          class="relative overflow-hidden rounded border border-border bg-black flex items-center justify-center w-full"
+          :style="{
+            height:
+              typeof props.height === 'number'
+                ? `${props.height}px`
+                : props.height,
+          }"
         >
           <template v-if="renderStates[index] && props.url">
-            <!-- 给 video 标签加上 object-fit 来实现缩放模式 -->
-            <component
-              :is="p.Player"
-              :api="p.api"
-              :url="props.url"
-              :object-fit="p.fit"
-              class="h-full w-full"
-              :style="{ objectFit: p.fit }"
-            />
+            <div class="absolute inset-0">
+              <component
+                :is="p.Player"
+                :api="p.api"
+                :url="props.url"
+                :object-fit="p.fit"
+                class="h-full w-full"
+              />
+            </div>
           </template>
           <span v-else class="text-xs text-foreground/40 text-center px-2">
             等待解码器调度...
