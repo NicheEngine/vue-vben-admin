@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { OssrsPlayerProps } from '@vben/ossrs-player';
+import type { OssrsObjectFit, OssrsPlayerProps } from '@vben/ossrs-player';
 
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
@@ -140,6 +140,14 @@ const SCALE_MODE_LABELS: Record<0 | 1 | 2, string> = {
   1: '等比留黑边',
   2: '等比裁切',
 };
+
+const SCALE_MODE_FIT: Record<0 | 1 | 2, OssrsObjectFit> = {
+  0: 'fill',
+  1: 'contain',
+  2: 'cover',
+};
+
+const objectFit = computed(() => SCALE_MODE_FIT[scaleMode.value]);
 
 const showMultiScreen = ref(false);
 
@@ -320,6 +328,7 @@ onBeforeUnmount(() => {
             :protocol="config.protocol"
             :muted="muted"
             :autoplay="config.autoPlay"
+            :object-fit="objectFit"
             class="h-full w-full"
           />
           <div
@@ -522,8 +531,7 @@ onBeforeUnmount(() => {
       <MultiScreenCompare
         v-if="showMultiScreen"
         :url="currentUrl"
-        :width="320"
-        :height="180"
+        :height="300"
         :protocol="config.protocol"
       />
     </Card>

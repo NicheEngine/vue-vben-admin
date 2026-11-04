@@ -253,18 +253,6 @@ export async function negotiateSession(
 
   const offer = await pc.createOffer();
 
-  // 👈 核心修复 1：在 SDP 中强制加入 FEC（前向纠错）和极小的 minptime
-  // 这能极大提升音频在弱网下的抗丢包能力，防止“结巴、重复发声”
-  if (offer.sdp && offer.sdp.includes('opus')) {
-    offer.sdp = offer.sdp.replaceAll(/a=fmtp:(\d+) (.*)/g, (match, pt) => {
-      // 如果是 opus 的 fmtp 行
-      if (offer.sdp?.includes(`a=rtpmap:${pt} opus`)) {
-        return `a=fmtp:${pt} minptime=10;useinbandfec=1`;
-      }
-      return match;
-    });
-  }
-
   await pc.setLocalDescription(offer);
   const session = await postSDPJson(apiUrl, {
     api: apiUrl,
@@ -276,12 +264,6 @@ export async function negotiateSession(
 
   if (!session.sdp) {
     throw new SrsError('InvalidResponse', 'No SDP in response');
-  }
-
-  // 👈 核心修复 2：剥离 SRS 返回的音频冗余（RED），避免浏览器触发重采样卡顿
-  if (session.sdp) {
-    session.sdp = session.sdp.replaceAll(/a=rtpmap:\d+ red\/48000\/2\r\n/g, '');
-    session.sdp = session.sdp.replaceAll(/a=fmtp:\d+ \d+\/\d+\/\d+\r\n/g, '');
   }
 
   await pc.setRemoteDescription(

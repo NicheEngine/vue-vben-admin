@@ -264,15 +264,6 @@ export function createOssrsAdapter(
 
     setScaleMode: (mode: 0 | 1 | 2) => {
       scaleMode.value = mode;
-      const video = api.video;
-      if (video) {
-        const fitMap: Record<0 | 1 | 2, string> = {
-          0: 'fill',
-          1: 'contain',
-          2: 'cover',
-        };
-        video.style.objectFit = fitMap[mode];
-      }
     },
     requestFullscreen: async () => {
       const el = api.video?.parentElement;

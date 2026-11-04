@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { OssrsPlayerProps } from './types';
 
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { OssrsPlayerApi } from './ossrs-player-api';
 
@@ -9,12 +9,17 @@ const props = withDefaults(defineProps<OssrsPlayerProps>(), {
   autoPlay: true,
   muted: true,
   protocol: 'rtc',
+  objectFit: 'contain',
 });
 
 const emit = defineEmits<{
   (e: 'error', error: Error | string): void;
   (e: 'pause' | 'play' | 'ready' | 'timeUpdate', data?: any): void;
 }>();
+
+const videoStyle = computed(() => ({
+  objectFit: props.objectFit,
+}));
 
 const videoRef = ref<HTMLVideoElement>();
 const ownsApi = !props.api;
@@ -80,7 +85,8 @@ defineExpose({ api });
   >
     <video
       ref="videoRef"
-      class="h-full w-full object-contain"
+      class="absolute inset-0 h-full w-full"
+      :style="videoStyle"
       autoplay
       playsinline
       webkit-playsinline

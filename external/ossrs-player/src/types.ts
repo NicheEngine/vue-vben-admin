@@ -2,6 +2,13 @@ import type { Ref } from 'vue';
 
 import type { OssrsPlayerApi } from './ossrs-player-api';
 
+export type OssrsObjectFit =
+  | 'contain'
+  | 'cover'
+  | 'fill'
+  | 'none'
+  | 'scale-down';
+
 export interface OssrsPlayerProps {
   url?: string;
   class?: string;
@@ -9,6 +16,8 @@ export interface OssrsPlayerProps {
   autoPlay?: boolean;
   muted?: boolean;
   api?: OssrsPlayerApi;
+  /** video 元素的 object-fit，默认 contain */
+  objectFit?: OssrsObjectFit;
 }
 
 /** 组件内部透传用（去掉 api，由 useOssrsPlayer 注入） */

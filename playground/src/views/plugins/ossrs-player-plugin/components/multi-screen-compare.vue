@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { OssrsObjectFit } from '@vben/ossrs-player';
+
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { useOssrsPlayer } from '@vben/ossrs-player';
@@ -6,18 +8,17 @@ import { useOssrsPlayer } from '@vben/ossrs-player';
 import { Card } from 'antdv-next';
 
 import { createOssrsAdapter } from '../../player-shared';
-
 const props = defineProps<{
   url: string;
-  width: number;
-  height: number;
+  // width: number | string;
+  height: number | string;
   protocol?: 'rtc' | 'whep';
 }>();
 
 const modes = [
-  { mode: 0 as const, label: '拉伸填满', fit: 'fill' as const },
-  { mode: 1 as const, label: '等比留黑边', fit: 'contain' as const },
-  { mode: 2 as const, label: '等比裁切', fit: 'cover' as const },
+  { mode: 0 as const, label: '拉伸填满', fit: 'fill' as OssrsObjectFit },
+  { mode: 1 as const, label: '等比留黑边', fit: 'contain' as OssrsObjectFit },
+  { mode: 2 as const, label: '等比裁切', fit: 'cover' as OssrsObjectFit },
 ];
 
 const players = modes.map(({ mode, label, fit }) => {
@@ -31,8 +32,6 @@ const players = modes.map(({ mode, label, fit }) => {
     },
   });
   const adapter = createOssrsAdapter(api, props.protocol || 'rtc');
-  adapter.setScaleMode?.(mode);
-
   return { Player, api, adapter, mode, label, fit };
 });
 
@@ -66,7 +65,7 @@ onBeforeUnmount(() => {
     <div class="mb-3 text-xs text-foreground/60">
       同一路流，三种缩放模式并排对比。容器尺寸：{{ width }} × {{ height }}。
     </div>
-    <div class="flex flex-wrap gap-4">
+    <div class="grid grid-cols-3 gap-4">
       <div
         v-for="(p, index) in players"
         :key="p.mode"
@@ -75,21 +74,27 @@ onBeforeUnmount(() => {
       >
         <div class="text-sm text-foreground/70">{{ p.label }}</div>
         <div
-          class="relative overflow-hidden rounded border border-border bg-black flex items-center justify-center"
-          :style="{ width: `${width}px`, height: `${height}px` }"
+          class="relative overflow-hidden rounded border border-border bg-black flex items-center justify-center w-full"
+          :style="{
+            height:
+              typeof props.height === 'number'
+                ? `${props.height}px`
+                : props.height,
+          }"
         >
           <template v-if="renderStates[index] && props.url">
-            <!-- 👈 不要把 url 再传给组件了，让它直接从 store 里拿 -->
-            <component
-              :is="p.Player"
-              :api="p.api"
-              :url="props.url"
-              :protocol="props.protocol || 'rtc'"
-              :autoplay="true"
-              :muted="true"
-              class="h-full w-full"
-              :style="{ objectFit: p.fit }"
-            />
+            <div class="absolute inset-0">
+              <component
+                :is="p.Player"
+                :api="p.api"
+                :url="props.url"
+                :protocol="props.protocol || 'rtc'"
+                :autoplay="true"
+                :muted="true"
+                :object-fit="p.fit"
+                class="h-full w-full"
+              />
+            </div>
           </template>
           <span v-else class="text-xs text-foreground/40 text-center px-2">
             等待 WebRTC 连接调度...
