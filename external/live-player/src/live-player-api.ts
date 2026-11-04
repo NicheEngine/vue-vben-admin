@@ -105,27 +105,27 @@ export class LivePlayerApi {
       const prev = this.prevState;
 
       if (state.isPlaying !== prev.isPlaying) {
-        if (state.isPlaying) this.emitUser('onPlay');
-        else this.emitUser('onPause');
+        if (state.isPlaying) this.dispatch('onPlay');
+        else this.dispatch('onPause');
       }
       if (state.error !== prev.error && state.error) {
-        this.emitUser('onError', new Error(state.error));
+        this.dispatch('onError', new Error(state.error));
       }
       if (state.isLoading !== prev.isLoading) {
-        if (state.isLoading) this.emitUser('onLoadStart');
-        else this.emitUser('onLoadEnd');
+        if (state.isLoading) this.dispatch('onLoadStart');
+        else this.dispatch('onLoadEnd');
       }
       if (state.isReady !== prev.isReady && state.isReady) {
-        this.emitUser('onReady');
+        this.dispatch('onReady');
       }
       if (state.currentTime !== prev.currentTime) {
-        this.emitUser('onTimeUpdate', state.currentTime);
+        this.dispatch('onTimeUpdate', state.currentTime);
       }
       if (state.volume !== prev.volume) {
-        this.emitUser('onVolumeChange', state.volume);
+        this.dispatch('onVolumeChange', state.volume);
       }
       if (state.url !== prev.url) {
-        this.emitUser('onUrlChange', state.url);
+        this.dispatch('onUrlChange', state.url);
       }
 
       this.prevState = state;
@@ -248,11 +248,19 @@ export class LivePlayerApi {
     }));
   }
 
-  private emitUser(
+  private dispatch(
     key: keyof Omit<LivePlayerApiOptions, keyof LivePlayerStoreState>,
     ...args: any[]
   ) {
-    (this.userCallbacks[key] as any)?.(...args);
-    (this.componentCallbacks[key] as any)?.(...args);
+    try {
+      (this.userCallbacks[key] as any)?.(...args);
+    } catch (error) {
+      console.warn(`[LivePlayerApi] user callback "${key}" error:`, error);
+    }
+    try {
+      (this.componentCallbacks[key] as any)?.(...args);
+    } catch (error) {
+      console.warn(`[LivePlayerApi] component callback "${key}" error:`, error);
+    }
   }
 }

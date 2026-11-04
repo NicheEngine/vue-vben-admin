@@ -13,7 +13,7 @@ export interface OssrsPlayerProps {
   url?: string;
   class?: string;
   protocol?: 'rtc' | 'whep';
-  autoPlay?: boolean;
+  autoplay?: boolean;
   muted?: boolean;
   api?: OssrsPlayerApi;
   /** video 元素的 object-fit，默认 contain */

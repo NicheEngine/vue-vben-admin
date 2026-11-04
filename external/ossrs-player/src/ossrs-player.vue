@@ -6,7 +6,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { OssrsPlayerApi } from './ossrs-player-api';
 
 const props = withDefaults(defineProps<OssrsPlayerProps>(), {
-  autoPlay: true,
+  autoplay: true,
   muted: true,
   protocol: 'rtc',
   objectFit: 'contain',
@@ -50,13 +50,14 @@ onMounted(() => {
       api.store.state.muted ? 'true' : 'false',
     );
     videoRef.value.setAttribute('playsinline', '');
-    videoRef.value.setAttribute('autoplay', '');
+
+    api.store.setState((prev) => ({ ...prev, autoplay: props.autoplay }));
 
     // 绑定底层 API
     api.bindVideoElement(videoRef.value);
 
     // 如果父组件传入了 URL，立即触发
-    if (props.url) {
+    if (props.url && props.autoplay) {
       api.play(props.url, props.protocol);
     }
   }
@@ -87,7 +88,6 @@ defineExpose({ api });
       ref="videoRef"
       class="absolute inset-0 h-full w-full"
       :style="videoStyle"
-      autoplay
       playsinline
       webkit-playsinline
     ></video>

@@ -4,10 +4,7 @@ import type { IPlayerApi, PlayerStats } from '../types';
 
 import { ref } from 'vue';
 
-export function createOssrsAdapter(
-  api: OssrsPlayerApi,
-  defaultProtocol: 'rtc' | 'whep' = 'rtc',
-): IPlayerApi {
+export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
   const isPlaying = ref(api.store.state.isPlaying);
   const isLoading = ref(api.store.state.isLoading);
   const isReady = ref(api.store.state.isReady);
@@ -26,6 +23,7 @@ export function createOssrsAdapter(
   const recordingDuration = ref(0);
   let mediaRecorder: MediaRecorder | null = null;
   let recordTimer: null | ReturnType<typeof setInterval> = null;
+  let drawTimer: null | ReturnType<typeof setInterval> = null;
 
   let lastUrl = '';
   let statsInterval: null | ReturnType<typeof setInterval> = null;
@@ -113,9 +111,10 @@ export function createOssrsAdapter(
         /* ignore */
       }
 
-      if (finalDelay <= 0) finalDelay = 25 + Math.random() * 10;
-      if (vbps === 0) vbps = 2_000_000 + Math.random() * 100_000;
+      // if (finalDelay <= 0) finalDelay = 25 + Math.random() * 10;
+      // if (vbps === 0) vbps = 2_000_000 + Math.random() * 100_000;
 
+      if (finalDelay < 0) finalDelay = 0;
       networkDelay.value = Math.round(finalDelay);
       stats.value = { ...stats.value, buf: networkDelay.value, vbps };
     }, 1000);
@@ -158,7 +157,7 @@ export function createOssrsAdapter(
         api.toggle();
         return;
       }
-      await api.play(lastUrl, defaultProtocol);
+      await api.play(lastUrl);
     },
     pause: async () => {
       api.pause();
@@ -174,9 +173,7 @@ export function createOssrsAdapter(
       if (!u) {
         api.destroyPlayer();
         stopStats();
-        return;
       }
-      void api.play(u, defaultProtocol);
     },
 
     screenshot: (opts) => {
@@ -200,7 +197,7 @@ export function createOssrsAdapter(
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
 
-      const drawTimer = setInterval(() => {
+      drawTimer = setInterval(() => {
         if (!video.paused && !video.ended) {
           ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
         }
@@ -215,7 +212,10 @@ export function createOssrsAdapter(
       };
 
       mediaRecorder.onstop = () => {
-        clearInterval(drawTimer);
+        if (drawTimer) {
+          clearInterval(drawTimer);
+          drawTimer = null;
+        }
         const blob = new Blob(chunks, { type: 'video/webm' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -252,6 +252,11 @@ export function createOssrsAdapter(
         mediaRecorder.stop();
       }
       if (recordTimer) clearInterval(recordTimer);
+
+      if (drawTimer) {
+        clearInterval(drawTimer);
+        drawTimer = null;
+      }
 
       if (api.video?.srcObject) {
         const stream = api.video.srcObject as MediaStream;

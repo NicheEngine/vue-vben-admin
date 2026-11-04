@@ -76,13 +76,6 @@ const [Player, api] = useLivePlayer({
 
 const player = createLiveAdapter(api);
 
-// ============================================================
-// 三、响应式状态
-// ============================================================
-const isPlaying = api.useSelector((s) => s.isPlaying);
-const volume = api.useSelector((s) => s.volume);
-const muted = api.useSelector((s) => s.muted);
-
 // 真正断开流的状态控制
 const isPlayerDestroyed = ref(false);
 const playerKey = ref(0);
@@ -190,7 +183,7 @@ function handleToggle() {
     return;
   }
 
-  const v = document.querySelector('video');
+  const v = api.video;
   if (!v) return;
 
   if (v.paused) {
@@ -226,7 +219,7 @@ function handleMuteChange(checked: boolean) {
 function handleVolumeChange(value: number) {
   api.setVolume(value);
 
-  const v = document.querySelector('video');
+  const v = api.video;
   if (v) {
     v.volume = value;
     if (value === 0) {
@@ -245,7 +238,7 @@ function handleScreenshot(): string {
 }
 
 function handleFullscreen() {
-  const videoContainer = document.querySelector('video')?.parentElement;
+  const videoContainer = api.video?.parentElement;
   if (!videoContainer) return;
 
   if (document.fullscreenElement) {
@@ -390,7 +383,7 @@ onBeforeUnmount(() => {
               :url="currentUrl"
               :autoplay="config.autoplay"
               :controls="config.controls"
-              :muted="muted"
+              :muted="player.isMuted.value"
               :type="config.type"
               class="h-full w-full"
             >
@@ -499,7 +492,7 @@ onBeforeUnmount(() => {
       <Card class="mb-4" title="播放控制">
         <div class="flex flex-wrap items-center gap-3">
           <Button @click="handleToggle">
-            {{ isPlaying && !isPlayerDestroyed ? '暂停' : '播放' }}
+            {{ player.isPlaying.value && !isPlayerDestroyed ? '暂停' : '播放' }}
           </Button>
           <Button @click="handleReload">重新加载</Button>
           <Button @click="handleFullscreen">全屏播放</Button>
@@ -509,7 +502,10 @@ onBeforeUnmount(() => {
         <div class="mt-4 flex flex-wrap items-center gap-4">
           <div class="flex items-center gap-2 whitespace-nowrap">
             <span class="text-sm">静音：</span>
-            <Switch :checked="muted" @change="handleMuteChange" />
+            <Switch
+              :checked="player.isMuted.value"
+              @change="handleMuteChange"
+            />
           </div>
           <div class="flex items-center gap-2 whitespace-nowrap">
             <span class="text-sm shrink-0">音量：</span>
@@ -518,11 +514,11 @@ onBeforeUnmount(() => {
               :min="0"
               :max="1"
               :step="0.01"
-              :value="volume"
+              :value="player.volume.value"
               @change="handleVolumeChange"
             />
             <span class="text-xs text-foreground/50 w-10 text-right shrink-0">
-              {{ Math.round(volume * 100) }}%
+              {{ Math.round(player.volume.value * 100) }}%
             </span>
           </div>
         </div>

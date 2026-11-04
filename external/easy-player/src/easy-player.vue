@@ -201,6 +201,7 @@ async function createInstance() {
 async function destroyInstance() {
   if (!instance) return;
   try {
+    unbindVideoEvents();
     api.destroyPlayer();
   } finally {
     instance = null;

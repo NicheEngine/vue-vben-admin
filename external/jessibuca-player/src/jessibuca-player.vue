@@ -9,7 +9,6 @@ const props = withDefaults(defineProps<JessibucaPlayerProps>(), {
   config: () => ({}),
   controls: true,
 });
-
 const emit = defineEmits<{
   play: [];
   pause: [];
@@ -24,6 +23,33 @@ const emit = defineEmits<{
   recordEnd: [blob: Blob];
   recording: [duration: number];
 }>();
+// ============================================================
+// 全局共享的 AudioContext 单例
+// ============================================================
+let globalAudioCtx: AudioContext | null = null;
+let globalAudioUnlocked = false;
+function unlockAudioContext() {
+  if (globalAudioUnlocked || typeof window === 'undefined') return;
+
+  try {
+    const AudioCtx =
+      (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = globalAudioCtx || new AudioCtx();
+    if (!globalAudioCtx) {
+      globalAudioCtx = ctx;
+    }
+    if (ctx.state === 'suspended') {
+      void ctx.resume().then(() => {
+        globalAudioUnlocked = true;
+      });
+    } else {
+      globalAudioUnlocked = true;
+    }
+  } catch (error) {
+    console.warn('[JessibucaPlayer] AudioContext 解锁失败', error);
+  }
+}
 
 const containerRef = ref<HTMLDivElement>();
 
@@ -78,17 +104,7 @@ async function createInstance() {
     return;
   }
 
-  // 👇 核心修复：在实例化前，强行唤醒一次 AudioContext，如果被拦截就算了
-  try {
-    const AudioCtx =
-      (window as any).AudioContext || (window as any).webkitAudioContext;
-    if (AudioCtx) {
-      const ctx = new AudioCtx();
-      if (ctx.state === 'suspended') {
-        void ctx.resume();
-      }
-    }
-  } catch {}
+  unlockAudioContext();
 
   const resolvedConfig = {
     ...api.getResolvedConfig(),
@@ -157,15 +173,8 @@ watch(
 onMounted(async () => {
   mounted = true;
 
-  // 👇 强行解锁 AudioContext
-  try {
-    const AudioCtx =
-      (window as any).AudioContext || (window as any).webkitAudioContext;
-    if (AudioCtx) {
-      const ctx = new AudioCtx();
-      if (ctx.state === 'suspended') void ctx.resume();
-    }
-  } catch {}
+  // 解锁 AudioContext
+  unlockAudioContext();
 
   if (props.url && !api.store.state.url) {
     api.setUrl(props.url);

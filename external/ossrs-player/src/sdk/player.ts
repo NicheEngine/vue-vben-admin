@@ -31,8 +31,8 @@ class SrsRtcPlayerAsyncImpl implements SrsRtcPlayer {
     );
 
     const session = await negotiateSession(pc, apiUrl, streamUrl, tid, [
-      { kind: 'audio', direction: 'recvonly' },
       { kind: 'video', direction: 'recvonly' },
+      { kind: 'audio', direction: 'recvonly' },
     ]);
 
     session.simulator = `${schema}//${urlObject.server}:${port}/rtc/v1/nack/`;

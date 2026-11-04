@@ -26,8 +26,8 @@ const maxValue = ref(props.max);
 let observer: null | ResizeObserver = null;
 
 function recomputeMax() {
-  const window = data.value.slice(-props.capacity);
-  const peak = Math.max(props.max, ...window);
+  const windowData = data.value.slice(-props.capacity);
+  const peak = Math.max(props.max, ...windowData);
   const target = peak * 1.2;
   if (target > maxValue.value * 1.5) {
     maxValue.value = target;

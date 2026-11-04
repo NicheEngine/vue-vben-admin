@@ -376,7 +376,6 @@ function onVolumeChange() {
   if (isApiMode && videoRef.value) api.setVolume(videoRef.value.volume);
 }
 function onCanPlay() {
-  if (isApiMode && api.store.state.url !== url.value) return;
   setLoading(false);
   if (isApiMode) api.updateReady(true);
 }

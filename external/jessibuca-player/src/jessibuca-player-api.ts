@@ -523,8 +523,22 @@ export class JessibucaPlayerApi {
     name: K,
     ...args: Parameters<NonNullable<JessibucaCallbacks[K]>>
   ) {
-    (this.userCallbacks[name] as any)?.(...args);
-    (this.componentCallbacks[name] as any)?.(...args);
+    try {
+      (this.userCallbacks[name] as any)?.(...args);
+    } catch (error) {
+      console.warn(
+        `[JessibucaPlayerApi] user callback "${name}" error:`,
+        error,
+      );
+    }
+    try {
+      (this.componentCallbacks[name] as any)?.(...args);
+    } catch (error) {
+      console.warn(
+        `[JessibucaPlayerApi] component callback "${name}" error:`,
+        error,
+      );
+    }
   }
 
   private patchDecoderInStore() {

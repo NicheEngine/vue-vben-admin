@@ -238,15 +238,6 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
 
     setScaleMode: (mode) => {
       scaleMode.value = mode;
-      const video = getVideo();
-      if (video) {
-        const fitMap: Record<0 | 1 | 2, string> = {
-          0: 'fill',
-          1: 'contain',
-          2: 'cover',
-        };
-        video.style.objectFit = fitMap[mode];
-      }
     },
 
     requestFullscreen: async () => {

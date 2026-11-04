@@ -1,10 +1,8 @@
 <script lang="ts" setup>
-import type { EasyPlayer } from '@vben/easy-player';
-
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
-import { useEasyPlayer } from '@vben/easy-player';
+import { EasyPlayer, useEasyPlayer } from '@vben/easy-player';
 
 import {
   Alert,
@@ -256,6 +254,7 @@ function handleVolumeChange(value: number) {
 
 function handleScaleModeChange(mode: 0 | 1 | 2) {
   player.setScaleMode?.(mode);
+  api.setScaleMode(mode);
 }
 
 function handleScreenshot(): string {

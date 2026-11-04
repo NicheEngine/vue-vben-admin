@@ -37,7 +37,7 @@ const players = modes.map(({ mode, label, fit }) => {
       url: props.url,
     },
   });
-  const adapter = createOssrsAdapter(api, props.protocol || 'rtc');
+  const adapter = createOssrsAdapter(api);
   return { Player, api, adapter, mode, label, fit };
 });
 

@@ -240,7 +240,12 @@ export class OssrsPlayerApi {
       video.muted = this.store.state.muted;
       video.setAttribute('muted', this.store.state.muted ? '' : 'false');
       video.setAttribute('playsinline', '');
-      video.setAttribute('autoplay', '');
+
+      if (this.store.state.autoplay) {
+        video.setAttribute('autoplay', '');
+      } else {
+        video.removeAttribute('autoplay');
+      }
 
       p.ontrack = (event: RTCTrackEvent) => {
         if (token !== this.playToken) return;
@@ -269,6 +274,19 @@ export class OssrsPlayerApi {
 
         if (event.track.kind === 'video' && !this.playStarted) {
           this.playStarted = true;
+
+          if (!this.store.state.autoplay) {
+            this.clearLoadTimeout();
+            this.store.setState((prev) => ({
+              ...prev,
+              isLoading: false,
+              isReady: true,
+              isPlaying: false,
+            }));
+            this.dispatch('onReady');
+            this.dispatch('onLoadEnd');
+            return;
+          }
 
           const forcePlay = () => {
             if (token !== this.playToken) return;
@@ -356,8 +374,19 @@ export class OssrsPlayerApi {
   }
 
   private dispatch(key: keyof OssrsCallbacks, ...args: any[]) {
-    (this.callbacks[key] as any)?.(...args);
-    (this.componentCallbacks[key] as any)?.(...args);
+    try {
+      (this.callbacks[key] as any)?.(...args);
+    } catch (error) {
+      console.warn(`[OssrsPlayerApi] user callback "${key}" error:`, error);
+    }
+    try {
+      (this.componentCallbacks[key] as any)?.(...args);
+    } catch (error) {
+      console.warn(
+        `[OssrsPlayerApi] component callback "${key}" error:`,
+        error,
+      );
+    }
   }
 
   private unbindVideoElement() {

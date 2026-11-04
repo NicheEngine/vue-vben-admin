@@ -39,7 +39,7 @@ const urlHistory = ref<string[]>([]);
 const isCleared = ref(false);
 
 const config = reactive<OssrsPlayerProps>({
-  autoPlay: true,
+  autoplay: true,
   muted: true,
   protocol: 'rtc',
 });
@@ -50,7 +50,7 @@ const [Player, api] = useOssrsPlayer({
   },
 });
 
-const player = createOssrsAdapter(api, config.protocol);
+const player = createOssrsAdapter(api);
 
 const vbps = ref(0);
 const delay = ref(0);
@@ -212,7 +212,7 @@ function handleFullscreen() {
 
 function handleClear() {
   isCleared.value = true;
-  api.pause();
+  api.destroyPlayer();
 }
 
 function handleScaleModeChange(mode: 0 | 1 | 2) {
@@ -319,7 +319,7 @@ onBeforeUnmount(() => {
             :url="currentUrl"
             :protocol="config.protocol"
             :muted="muted"
-            :autoplay="config.autoPlay"
+            :autoplay="config.autoplay"
             :object-fit="objectFit"
             class="h-full w-full"
           />
@@ -458,7 +458,7 @@ onBeforeUnmount(() => {
       >
         <div class="flex items-center gap-2 whitespace-nowrap">
           <span class="text-sm">自动播放：</span>
-          <Switch v-model:checked="config.autoPlay" />
+          <Switch v-model:checked="config.autoplay" />
         </div>
         <div class="flex items-center gap-2 whitespace-nowrap">
           <span class="text-sm">协议：</span>

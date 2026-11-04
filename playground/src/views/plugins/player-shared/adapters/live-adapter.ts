@@ -79,6 +79,10 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
         clearInterval(recordTimer);
         recordTimer = null;
       }
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        mediaRecorder = null;
+      }
       api.destroy();
     },
 

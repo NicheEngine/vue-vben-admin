@@ -42,10 +42,11 @@ class SrsRtcWhipWhepAsyncImpl implements SrsRtcWhipWhep {
     }
     const pc = this.ensurePc();
 
-    // 👈 核心修复：必须显式添加音频接收器，否则没有声音！
-    pc.addTransceiver('audio', { direction: 'recvonly' });
-    pc.addTransceiver('video', { direction: 'recvonly' });
-
+    // 核心修复：必须显式添加音频接收器，否则没有声音！
+    if (pc.getTransceivers().length === 0) {
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+    }
     return this.negotiateWhipWhep(url, pc);
   }
 

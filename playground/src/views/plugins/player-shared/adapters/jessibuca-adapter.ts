@@ -65,7 +65,7 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
   });
 
   // 同步底层 store 变化
-  api.store.subscribe((state) => {
+  const unsub = api.store.subscribe((state) => {
     isPlaying.value = state.isPlaying;
     volume.value = state.volume;
     isMuted.value = state.isMuted;
@@ -110,6 +110,7 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
 
     // 👈 修复内存泄漏：在销毁时彻底断开订阅
     destroy: async () => {
+      unsub.unsubscribe();
       await api.destroy();
     },
 
