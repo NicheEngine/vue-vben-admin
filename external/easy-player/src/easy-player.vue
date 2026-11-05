@@ -395,7 +395,10 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="wrapperRef" class="easy-player-wrapper">
+  <div
+    ref="wrapperRef"
+    class="easy-player-wrapper relative flex items-center justify-center w-full h-full overflow-hidden bg-black"
+  >
     <component
       :is="tagName"
       ref="playerEl"
@@ -432,20 +435,12 @@ defineExpose({
 </template>
 
 <style scoped>
-/* 保持不变 */
+/* 保留 CSS 变量和强力穿透样式（必须使用 :deep 和 !important 来压制 video.js） */
 .easy-player-wrapper {
   --easy-player-fit: contain;
-
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background-color: #000;
 }
 
+/* Web Component 本身的绝对定位 */
 .easy-player-wrapper :deep(easy-player) {
   position: absolute !important;
   top: 0 !important;
@@ -455,6 +450,7 @@ defineExpose({
   height: 100% !important;
 }
 
+/* video.js 内部的 wrapper 铺满 */
 .easy-player-wrapper :deep(easy-player > div),
 .easy-player-wrapper :deep(.video-js) {
   position: absolute !important;
@@ -464,6 +460,7 @@ defineExpose({
   height: 100% !important;
 }
 
+/* 原生 video 标签的拉伸与适配 */
 .easy-player-wrapper :deep(video),
 .easy-player-wrapper :deep(canvas) {
   position: absolute !important;

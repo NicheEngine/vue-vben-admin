@@ -44,7 +44,6 @@ export interface AutoPlayerProps {
   autoplay?: boolean;
   muted?: boolean;
   class?: string;
-  height?: number | string;
 }
 
 export interface AutoPlayerExpose {

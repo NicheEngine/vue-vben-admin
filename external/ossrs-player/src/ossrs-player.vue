@@ -92,7 +92,7 @@ defineExpose({ api });
       webkit-playsinline
     ></video>
 
-    <!-- 👈 使用 Tailwind 的过渡类代替 scoped style -->
+    <!-- 使用 Tailwind 的过渡类代替 scoped style -->
     <Transition
       enter-active-class="transition-opacity duration-200"
       enter-from-class="opacity-0"

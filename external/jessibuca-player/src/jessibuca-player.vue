@@ -207,16 +207,7 @@ defineExpose({ api });
 <template>
   <div
     ref="containerRef"
-    class="jessibuca-player-wrapper"
+    class="jessibuca-player-wrapper relative flex items-center justify-center w-full h-full overflow-hidden bg-black"
     :class="props.class"
   ></div>
 </template>
-
-<style scoped>
-.jessibuca-player-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background-color: #000;
-}
-</style>

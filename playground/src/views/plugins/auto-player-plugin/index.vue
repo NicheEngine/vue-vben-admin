@@ -4,15 +4,16 @@ import type { OssrsObjectFit } from '@vben/ossrs-player';
 
 import type { IPlayerApi } from '../player-shared';
 
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 import { AutoPlayer } from '@vben/auto-player';
 import { Page } from '@vben/common-ui';
 
 import {
-  Alert,
   Button,
   Card,
+  Collapse,
+  CollapsePanel,
   InputNumber,
   Select,
   Slider,
@@ -41,21 +42,23 @@ const autoPlayerRef = ref<AutoPlayerExpose | null>(null);
 const player = computed<IPlayerApi | null>(() => {
   const proxy = autoPlayerRef.value?.api;
   if (!proxy) return null;
+  const state = proxy.state;
 
   return {
-    isPlaying: computed(() => proxy.state.isPlaying),
-    isLoading: computed(() => proxy.state.isLoading),
-    isReady: computed(() => proxy.state.isReady),
-    error: computed(() => proxy.state.error),
-    volume: computed(() => proxy.state.volume),
-    isMuted: computed(() => proxy.state.isMuted),
-    videoWidth: computed(() => proxy.state.videoWidth),
-    videoHeight: computed(() => proxy.state.videoHeight),
-    currentTime: computed(() => proxy.state.currentTime),
-    networkDelay: computed(() => proxy.state.networkDelay),
-    stats: computed(() => proxy.state.stats || { vbps: 0, buf: 0 }),
-    isRecording: computed(() => proxy.state.isRecording),
-    recordingDuration: computed(() => proxy.state.recordingDuration),
+    // 这里的 state 是一个响应式对象，直接获取值
+    isPlaying: computed(() => state.isPlaying),
+    isLoading: computed(() => state.isLoading),
+    isReady: computed(() => state.isReady),
+    error: computed(() => state.error),
+    volume: computed(() => state.volume),
+    isMuted: computed(() => state.isMuted),
+    videoWidth: computed(() => state.videoWidth),
+    videoHeight: computed(() => state.videoHeight),
+    currentTime: computed(() => state.currentTime),
+    networkDelay: computed(() => state.networkDelay),
+    stats: computed(() => state.stats || { vbps: 0, buf: 0 }),
+    isRecording: computed(() => state.isRecording),
+    recordingDuration: computed(() => state.recordingDuration),
     scaleMode: ref(1),
 
     capabilities: {
@@ -237,14 +240,6 @@ function handleScreenshot(): string {
   const result = player.value?.screenshot?.();
   return typeof result === 'string' ? result : '';
 }
-
-// 当强制切换引擎时，必须让播放器重新加载 URL
-watch(forcedEngine, () => {
-  if (currentUrl.value) {
-    // 利用 setTimeout 确保底层 engine 已经切换完毕
-    setTimeout(() => player.value?.setUrl(currentUrl.value), 100);
-  }
-});
 </script>
 
 <template>
@@ -256,9 +251,9 @@ watch(forcedEngine, () => {
       </div>
     </template>
 
-    <Alert class="mb-4" type="info" show-icon message="环境说明与智能调度规则">
-      <template #description>
-        <div class="text-xs leading-relaxed mt-2 space-y-2 text-foreground/80">
+    <Collapse class="mb-4">
+      <CollapsePanel key="1" header="💡 AutoPlayer 环境说明与智能调度规则">
+        <div class="text-xs leading-relaxed text-foreground/80 space-y-2">
           <p>
             <b>🎯 智能调度规则：</b><br />
             系统会自动嗅探当前浏览器的运行环境，并根据流媒体协议为您分配最优的播放器内核：
@@ -283,8 +278,8 @@ watch(forcedEngine, () => {
             此组件已自动处理了不同内核间的内存释放与切换逻辑。
           </p>
         </div>
-      </template>
-    </Alert>
+      </CollapsePanel>
+    </Collapse>
 
     <!-- 播放地址与引擎 -->
     <Card class="mb-4" title="播放地址与引擎">
@@ -300,8 +295,8 @@ watch(forcedEngine, () => {
           />
         </div>
         <Tag color="blue" class="text-sm px-3 py-1">
-当前生效：{{ activeEngineLabel }}
-</Tag>
+          当前生效：{{ activeEngineLabel }}
+        </Tag>
       </div>
 
       <div v-if="urlHistory.length > 0" class="mt-3">
@@ -346,12 +341,6 @@ watch(forcedEngine, () => {
             :object-fit="objectFit"
             class="w-full h-full absolute inset-0"
           />
-          <div
-            v-if="!currentUrl"
-            class="absolute inset-0 flex items-center justify-center text-foreground/40 text-sm"
-          >
-            请输入流媒体地址
-          </div>
         </div>
       </div>
     </Card>

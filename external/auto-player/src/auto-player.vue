@@ -45,14 +45,13 @@ import { detectEngine } from './player-router';
 const props = withDefaults(defineProps<AutoPlayerProps>(), {
   autoplay: true,
   muted: true,
-  height: 300,
   preferEngine: 'none',
 });
 
 const env = reactive({ hasJessibuca: false, hasEasyPlayer: false });
 const isEnvReady = ref(false);
 
-// 初始化实例
+// ================= 初始化实例 =================
 const ossrsApi = useOssrsPlayer({
   onError: (err: any) => {
     console.warn('[ossrs] player error:', err);
@@ -93,7 +92,7 @@ const easyApi = useEasyPlayer({
   },
 })[1];
 
-// 统一转换为 Adapter
+// ================= 统一转换为 Adapter =================
 const adapters: Partial<Record<PlayerEngine, IPlayerApi>> = {
   ossrs: createOssrsAdapter(ossrsApi),
   live: createLiveAdapter(liveApi),
@@ -101,7 +100,18 @@ const adapters: Partial<Record<PlayerEngine, IPlayerApi>> = {
   easy: createEasyAdapter(easyApi),
 };
 
-// 聚合状态
+// ================= 引擎路由计算 =================
+const activeEngine = computed(() => {
+  if (!isEnvReady.value) return 'none';
+  return detectEngine(props.url, {
+    hasJessibuca: env.hasJessibuca,
+    hasEasyPlayer: env.hasEasyPlayer,
+    preferEngine: props.preferEngine,
+  });
+});
+
+// ================= 聚合状态 (核心修复区) =================
+// 使用 reactive 确保外部拿到的对象始终是同一个引用，响应式不会被打破
 const activeState = reactive<AutoPlayerState>({
   isPlaying: false,
   isLoading: false,
@@ -119,23 +129,31 @@ const activeState = reactive<AutoPlayerState>({
   activeEngine: 'none',
 });
 
-const activeEngine = computed(() => {
-  if (!isEnvReady.value) return 'none';
-  return detectEngine(props.url, {
-    hasJessibuca: env.hasJessibuca,
-    hasEasyPlayer: env.hasEasyPlayer,
-    preferEngine: props.preferEngine,
-  });
-});
-
-// 监听活跃引擎，绑定对应的 Adapter 状态
+// 监听引擎变化，重置状态并重新绑定底层 Ref
 watch(
   activeEngine,
   (engine) => {
     activeState.activeEngine = engine;
+
+    // 1. 重置基础状态
+    Object.assign(activeState, {
+      isPlaying: false,
+      isLoading: false,
+      isReady: false,
+      error: null,
+      videoWidth: 0,
+      videoHeight: 0,
+      currentTime: 0,
+      networkDelay: 0,
+      stats: {},
+      isRecording: false,
+      recordingDuration: 0,
+    });
+
     const currentAdapter = adapters[engine];
     if (!currentAdapter) return;
 
+    // 2. 使用数组监听强行收集底层所有 Ref，解决 LivePlayer 有时不触发的问题
     watch(
       () => ({
         playing: currentAdapter.isPlaying.value,
@@ -173,32 +191,46 @@ watch(
   { immediate: true },
 );
 
-// 监听 url 变化，直接通过底层 api 触发播放（解决底层组件未触发的问题）
+// ================= 监听外部配置变化 =================
+// 1. 静音同步
 watch(
-  [() => props.url, () => activeEngine.value],
-  async ([newUrl, engine]) => {
-    const adapter = adapters[engine];
-    if (!adapter || !newUrl) return;
-    // 核心修复：先 setUrl，确保底层 Store 拿到了地址
-    adapter.setUrl(newUrl);
-
-    if (engine === 'ossrs') {
-      const protocol =
-        newUrl.includes('/whep/') || newUrl.includes('/whip-play/')
-          ? 'whep'
-          : 'rtc';
-      ossrsApi.play(newUrl, protocol);
-    } else {
-      adapter
-        .play()
-        .catch((error) =>
-          console.error(`[AutoPlayer] ${engine} 播放失败`, error),
-        );
+  [() => props.muted, activeEngine],
+  ([muted, engine]) => {
+    const currentAdapter = adapters[engine];
+    if (currentAdapter) {
+      currentAdapter.setMuted?.(muted);
     }
   },
   { immediate: true },
 );
 
+// 2. 自动播放控制
+watch(
+  () => props.autoplay,
+  (autoplay) => {
+    if (!autoplay) {
+      Object.values(adapters).forEach((adapter) => {
+        adapter?.pause?.();
+      });
+    }
+  },
+  { immediate: true },
+);
+
+// 3. URL 注入
+watch(
+  [() => props.url, () => activeEngine.value],
+  ([newUrl, engine]) => {
+    if (!newUrl || !engine || engine === 'none') return;
+    const adapter = adapters[engine];
+    if (adapter) {
+      adapter.setUrl(newUrl);
+    }
+  },
+  { immediate: true },
+);
+
+// ================= 统一暴露代理 API =================
 const proxyApi: AutoPlayerApi = {
   getActiveEngine: () => activeEngine.value,
   getRawInstance: () => {
@@ -232,9 +264,11 @@ const proxyApi: AutoPlayerApi = {
     jessibucaApi.destroy();
     easyApi.destroy();
   },
+  // 👈 直接暴露 reactive 对象
   state: activeState,
 };
 
+// 暴露给父组件
 defineExpose({ api: proxyApi });
 
 onMounted(async () => {
@@ -250,18 +284,16 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    class="auto-player-wrapper relative w-full overflow-hidden bg-black"
+    class="relative flex w-full overflow-hidden bg-black"
     :class="props.class"
-    :style="{ height: typeof height === 'number' ? `${height}px` : height }"
   >
     <div
       v-if="!isEnvReady"
-      class="flex h-full items-center justify-center text-white/50"
+      class="flex h-full w-full items-center justify-center text-white/50"
     >
       环境检测中...
     </div>
     <template v-else>
-      <!-- 👈 统一用 absolute inset-0 包裹底层组件，强制撑满父容器 -->
       <div v-if="activeEngine === 'ossrs'" class="absolute inset-0">
         <OssrsPlayer
           :api="ossrsApi"
@@ -300,38 +332,10 @@ onBeforeUnmount(() => {
 
       <div
         v-else
-        class="absolute inset-0 flex items-center justify-center bg-black text-red-400"
+        class="absolute inset-0 flex items-center justify-center bg-black text-foreground/40 text-sm"
       >
-        当前环境无可用播放器
+        {{ !props.url ? '请输入流媒体地址' : '当前环境无可用播放器' }}
       </div>
     </template>
   </div>
 </template>
-<style scoped>
-.auto-player-wrapper {
-  position: relative;
-  width: 100%;
-  overflow: hidden;
-  background-color: #000;
-}
-
-/* 穿透覆盖所有底层播放器的 video 和 canvas，强制铺满 */
-.auto-player-wrapper :deep(video),
-.auto-player-wrapper :deep(canvas) {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain !important; /* 保证画面比例 */
-}
-
-/* 针对 Jessibuca 的特定容器做铺满 */
-.auto-player-wrapper :deep(.jessibuca-player-wrapper) {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-</style>
