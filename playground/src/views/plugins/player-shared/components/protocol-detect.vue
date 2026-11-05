@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { ProbeResult, ProtocolInfo } from '../utils/protocol';
+import type { ProbeResult } from '../utils/protocol';
 
 import { computed, ref } from 'vue';
 
@@ -28,8 +28,46 @@ const url = computed({
   set: (v) => emit('update:modelValue', v),
 });
 
-const info = computed<ProtocolInfo>(() => detectProtocol(url.value));
+const info = computed(() => {
+  const urlStr = url.value.trim();
+  if (!urlStr) return detectProtocol(urlStr);
 
+  const lower = urlStr.toLowerCase();
+  // 针对 OSSRS 的全协议特殊处理
+  if (lower.startsWith('webrtc://') || lower.startsWith('rtc://')) {
+    return {
+      protocol: 'webrtc',
+      label: 'SRS RTC',
+      color: 'green',
+      description: '超低延迟 WebRTC',
+    };
+  }
+  if (lower.includes('/whep/') || lower.includes('/whip-play/')) {
+    return {
+      protocol: 'whep',
+      label: 'WHEP',
+      color: 'blue',
+      description: '标准 WebRTC 协议',
+    };
+  }
+  if (lower.includes('.flv')) {
+    return {
+      protocol: 'http-flv',
+      label: 'HTTP-FLV',
+      color: 'green',
+      description: '支持通过 OSSRS 极速播放',
+    };
+  }
+  if (lower.includes('.m3u8')) {
+    return {
+      protocol: 'hls',
+      label: 'HLS (m3u8)',
+      color: 'blue',
+      description: '支持通过 OSSRS 兼容播放',
+    };
+  }
+  return detectProtocol(urlStr);
+});
 const probing = ref(false);
 const probeResult = ref<null | ProbeResult>(null);
 

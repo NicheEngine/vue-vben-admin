@@ -1,6 +1,5 @@
 import type { JessibucaPlayerApi } from '@vben/jessibuca-player';
-
-import type { IPlayerApi, PlayerStats } from '../types';
+import type { IPlayerApi, PlayerStats } from '@vben/player-types';
 
 import { computed, ref } from 'vue';
 
@@ -37,10 +36,18 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
       isLoading.value = false;
       prev?.onLoad?.();
     },
+    onError: (err) => {
+      console.error('[Jessibuca Adapter] 播放报错:', err);
+      prev?.onError?.(err);
+    },
+    onTimeout: (err) => {
+      console.error('[Jessibuca Adapter] 播放超时:', err);
+      prev?.onTimeout?.(err);
+    },
     onStats: (s) => {
       isLoading.value = false;
       stats.value = { ...s };
-      networkDelay.value = Math.max(0, Math.min(s.buf || 0, 3000)); // 限制在 0-3秒内，防累加错误
+      networkDelay.value = Math.max(0, Math.min(s.buf || 0, 3000));
       currentTime.value = (s.ts || 0) / 1000;
       prev?.onStats?.(s);
     },

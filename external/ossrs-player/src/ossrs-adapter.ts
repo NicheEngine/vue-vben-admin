@@ -1,6 +1,5 @@
 import type { OssrsPlayerApi } from '@vben/ossrs-player';
-
-import type { IPlayerApi, PlayerStats } from '../types';
+import type { IPlayerApi, PlayerStats } from '@vben/player-types';
 
 import { ref } from 'vue';
 

@@ -1,4 +1,5 @@
 import type Mpegts from 'mpegts.js';
+export { createLiveAdapter } from './live-adapter';
 export { LivePlayerApi } from './live-player-api';
 export { default as LivePlayer } from './live-player.vue';
 export { LiveType } from './types';

@@ -1071,11 +1071,35 @@ importers:
         specifier: 3.5.41
         version: 3.5.41(typescript@6.0.3)
 
+  external/auto-player:
+    dependencies:
+      '@vben/easy-player':
+        specifier: workspace:*
+        version: link:../easy-player
+      '@vben/jessibuca-player':
+        specifier: workspace:*
+        version: link:../jessibuca-player
+      '@vben/live-player':
+        specifier: workspace:*
+        version: link:../live-player
+      '@vben/ossrs-player':
+        specifier: workspace:*
+        version: link:../ossrs-player
+      '@vben/player-types':
+        specifier: workspace:*
+        version: link:../player-types
+      vue:
+        specifier: 3.5.41
+        version: 3.5.41(typescript@6.0.3)
+
   external/easy-player:
     dependencies:
       '@vben-core/shared':
         specifier: workspace:*
         version: link:../../packages/@core/base/shared
+      '@vben/player-types':
+        specifier: workspace:*
+        version: link:../player-types
       vue:
         specifier: 3.5.41
         version: 3.5.41(typescript@6.0.3)
@@ -1089,6 +1113,9 @@ importers:
       '@vben-core/shared':
         specifier: workspace:*
         version: link:../../packages/@core/base/shared
+      '@vben/player-types':
+        specifier: workspace:*
+        version: link:../player-types
       vue:
         specifier: 3.5.41
         version: 3.5.41(typescript@6.0.3)
@@ -1102,6 +1129,9 @@ importers:
       '@vben-core/shared':
         specifier: workspace:*
         version: link:../../packages/@core/base/shared
+      '@vben/player-types':
+        specifier: workspace:*
+        version: link:../player-types
       hls.js:
         specifier: 'catalog:'
         version: 1.7.4
@@ -1117,6 +1147,15 @@ importers:
       '@vben-core/shared':
         specifier: workspace:*
         version: link:../../packages/@core/base/shared
+      '@vben/player-types':
+        specifier: workspace:*
+        version: link:../player-types
+      vue:
+        specifier: 3.5.41
+        version: 3.5.41(typescript@6.0.3)
+
+  external/player-types:
+    dependencies:
       vue:
         specifier: 3.5.41
         version: 3.5.41(typescript@6.0.3)
@@ -2155,6 +2194,9 @@ importers:
       '@vben/access':
         specifier: workspace:*
         version: link:../packages/effects/access
+      '@vben/auto-player':
+        specifier: workspace:*
+        version: link:../external/auto-player
       '@vben/common-ui':
         specifier: workspace:*
         version: link:../packages/effects/common-ui

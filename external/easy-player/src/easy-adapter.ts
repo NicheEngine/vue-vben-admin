@@ -1,6 +1,5 @@
 import type { EasyPlayerApi } from '@vben/easy-player';
-
-import type { IPlayerApi, PlayerStats } from '../types';
+import type { IPlayerApi, PlayerStats } from '@vben/player-types';
 
 import { ref } from 'vue';
 

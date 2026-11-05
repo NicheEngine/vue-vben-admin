@@ -32,6 +32,15 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'AutoPlayerPluginExample',
+        path: 'auto-player',
+        component: () => import('#/views/plugins/auto-player-plugin/index.vue'),
+        meta: {
+          icon: 'mdi:auto-fix',
+          title: $t('plugins.autoPlayer'),
+        },
+      },
+      {
         name: 'LivePlayerPluginExample',
         path: 'live-player',
         component: () => import('#/views/plugins/live-player-plugin/index.vue'),

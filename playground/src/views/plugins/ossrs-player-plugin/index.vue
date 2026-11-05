@@ -7,9 +7,10 @@ import { Page } from '@vben/common-ui';
 import { useOssrsPlayer } from '@vben/ossrs-player';
 
 import {
-  Alert,
   Button,
   Card,
+  Collapse,
+  CollapsePanel,
   InputNumber,
   Select,
   Slider,
@@ -77,9 +78,16 @@ const muted = api.useSelector((s: any) => s.muted);
 const effectiveType = computed(() => {
   if (!currentUrl.value) return '-';
   const proto = detectOssrsProtocol(currentUrl.value);
-  if (proto === 'whep') return 'WHEP';
-  if (proto === 'rtc') return 'SRS RTC';
-  return '未知';
+  const map: Record<string, string> = {
+    whep: 'WHEP',
+    rtc: 'SRS RTC',
+    flv: 'FLV (HTTP)',
+    'ws-flv': 'WS-FLV (WebSocket)',
+    'wss-flv': 'WSS-FLV (WebSocket 加密)',
+    hls: 'HLS (M3U8)',
+    unknown: '未知',
+  };
+  return map[proto] || '未知';
 });
 
 type SizeMode = 'auto' | 'fixed' | 'ratio';
@@ -152,9 +160,23 @@ function applyUrl(u?: string) {
   const value = (u ?? inputUrl.value).trim();
   if (!value) return;
 
+  const lower = value.toLowerCase();
+
+  // Oryx 底层的 SrsRtc 库实际上只认 rtc 和 whep
+  let autoProtocol: 'rtc' | 'whep' = 'rtc';
+  if (lower.includes('/whep/') || lower.includes('/whip-play/')) {
+    autoProtocol = 'whep';
+  }
+
+  // UI 状态同步
   const detectedProtocol = detectOssrsProtocol(value);
-  if (detectedProtocol !== 'unknown' && config.protocol !== detectedProtocol) {
-    config.protocol = detectedProtocol;
+  if (
+    detectedProtocol !== 'unknown' &&
+    config.protocol !== (detectedProtocol as any)
+  ) {
+    // 如果类型对不上，这里可以保留原本的 config.protocol，或者强制映射
+    // 因为 ossrs-player 的 types 里面 protocol 只能传 'rtc' | 'whep'
+    config.protocol = detectedProtocol === 'whep' ? 'whep' : 'rtc';
   }
 
   isCleared.value = false;
@@ -164,7 +186,7 @@ function applyUrl(u?: string) {
   history.unshift(value);
   urlHistory.value = history.slice(0, 10);
 
-  api.play(value, config.protocol);
+  api.play(value, autoProtocol);
 }
 
 function resetUrl() {
@@ -234,33 +256,63 @@ onBeforeUnmount(() => {
   <Page title="OSSRS 播放器 (WebRTC)">
     <template #description>
       <div class="mt-2 text-foreground/80">
-        OSSRS 基于 WebRTC 协议，提供极低延迟的视频播放能力。支持 SRS RTC 与 WHEP
-        协议。
-        <span class="text-red-500 font-bold">注意：不支持 HTTP-FLV 和 HLS 播放</span>。
+        OSSRS 基于 Oryx 强大的 WebRTC 网关，提供极低延迟的视频播放能力。<br />
+        <span class="text-green-500 font-bold">支持协议：WebRTC, WHEP, HTTP-FLV, WS-FLV, HLS (M3U8)</span>。
       </div>
     </template>
 
-    <Alert
-      class="mb-4"
-      type="info"
-      show-icon
-      message="如何获取 Oryx WebRTC 播放地址？"
-    >
-      <template #description>
-        <div class="text-xs leading-relaxed mt-1">
-          1. 在 Oryx 后台推流成功后，进入 <b>“流信息”</b> 页面。<br />
-          2. 找到 <b>WebRTC</b> 播放地址，格式通常为：
-          <code>webrtc://[IP]:[PORT]/live/[流名称]</code>
-          或 <code>rtc://[IP]:[PORT]/live/[流名称]</code>。<br />
-          3. 将地址填入上方输入框点击应用即可（若使用 WHEP 协议，地址格式为
-          <code>http://.../whep/</code>）。<br />
-          <span class="text-red-500 font-medium">
-            ⚠️ 重要：如果使用 localhost 或 127.0.0.1，请确保浏览器不受 WebRTC
-            安全上下文限制，建议用局域网 IP 或 HTTPS 环境测试。
-          </span>
+    <Collapse class="mb-4">
+      <CollapsePanel
+        key="1"
+        header="💡 OSSRS 全协议网关说明（专为 Oryx / SRS 定制）"
+      >
+        <div class="text-xs leading-relaxed text-foreground/80 space-y-3">
+          <p>
+            <b>OSSRS 播放器具备极强的兼容性。</b>Oryx
+            具备强大的<b>全协议统一网关</b>，只要您的流媒体服务是 Oryx 或
+            SRS，无论您输入以下哪种地址，底层都会自动将其转化为
+            <code>/rtc/v1/play/</code> 的 WebRTC
+            流，为您提供极低延迟的播放体验：
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div class="bg-black/20 p-2 rounded border border-border">
+              <div class="font-bold text-blue-400 mb-1">WebRTC 原生协议</div>
+              <code>webrtc://[IP]:[PORT]/live/[流名称]</code><br />
+              <code>rtc://[IP]:[PORT]/live/[流名称]</code>
+            </div>
+            <div class="bg-black/20 p-2 rounded border border-border">
+              <div class="font-bold text-green-400 mb-1">WHEP 标准协议</div>
+              <code>http://[IP]:[PORT]/whep/...</code>
+            </div>
+            <div class="bg-black/20 p-2 rounded border border-border">
+              <div class="font-bold text-orange-400 mb-1">
+                FLV 系列 (极速转 WebRTC)
+              </div>
+              <code>http://[IP]:[PORT]/live/[流名称].flv</code><br />
+              <code>ws://[IP]:[PORT]/live/[流名称].flv</code><br />
+              <code>wss://[IP]:[PORT]/live/[流名称].flv</code>
+            </div>
+            <div class="bg-black/20 p-2 rounded border border-border">
+              <div class="font-bold text-purple-400 mb-1">HLS (M3U8)</div>
+              <code>http://[IP]:[PORT]/live/[流名称].m3u8</code>
+            </div>
+          </div>
+
+          <div
+            class="rounded-md bg-red-500/10 p-2 text-red-500 border border-red-500/20"
+          >
+            <b>⚠️ 安全与兼容性提示：</b><br />
+            1. 如果使用 localhost 或 127.0.0.1，请确保浏览器不受 WebRTC
+            安全上下文限制，建议用局域网 IP 或 HTTPS 环境测试。<br />
+            2. 如果您测试的是<b>非 SRS/Oryx</b> 的普通流媒体服务器，请移步
+            <b>AutoPlayer</b> 或对应的
+            <b>LivePlayer / Jessibuca / EasyPlayer</b>
+            插件进行测试，因为它们才支持标准的通用拉流协议。
+          </div>
         </div>
-      </template>
-    </Alert>
+      </CollapsePanel>
+    </Collapse>
 
     <Card class="mb-4" title="播放地址">
       <ProtocolDetect

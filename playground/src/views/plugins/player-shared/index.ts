@@ -1,7 +1,3 @@
-export { createEasyAdapter } from './adapters/easy-adapter';
-export { createJessibucaAdapter } from './adapters/jessibuca-adapter';
-export { createLiveAdapter } from './adapters/live-adapter';
-export { createOssrsAdapter } from './adapters/ossrs-adapter';
 export { default as NetworkChart } from './components/network-chart.vue';
 export { default as PlayStatusPanel } from './components/play-status-panel.vue';
 export { default as ProtocolDetect } from './components/protocol-detect.vue';
@@ -14,3 +10,7 @@ export {
   probeUrl,
 } from './utils/protocol';
 export type { ProbeResult, ProtocolInfo } from './utils/protocol';
+export { createEasyAdapter } from '@vben/easy-player';
+export { createJessibucaAdapter } from '@vben/jessibuca-player';
+export { createLiveAdapter } from '@vben/live-player';
+export { createOssrsAdapter } from '@vben/ossrs-player';

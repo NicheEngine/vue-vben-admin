@@ -35,6 +35,7 @@
     "@vben-core/menu-ui": "workspace:*",
     "@vben-core/typings": "workspace:*",
     "@vben/access": "workspace:*",
+    "@vben/auto-player": "workspace:*",
     "@vben/common-ui": "workspace:*",
     "@vben/constants": "workspace:*",
     "@vben/easy-player": "workspace:*",

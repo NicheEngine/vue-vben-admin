@@ -1,4 +1,5 @@
 export * from './callbacks';
+export { createEasyAdapter } from './easy-adapter';
 export { EasyPlayerApi } from './easy-player-api';
 export { default as EasyPlayer } from './easy-player.vue';
 export type * from './types';

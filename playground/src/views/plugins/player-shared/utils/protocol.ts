@@ -168,20 +168,40 @@ export async function probeUrl(url: string): Promise<ProbeResult> {
 }
 
 /**
- * 专门用于探测 OSSRS 的 RTC/WHEP 协议
+ * 专门用于探测 Oryx / SRS 支持的协议类型
  */
-export function detectOssrsProtocol(url: string): 'rtc' | 'unknown' | 'whep' {
+export function detectOssrsProtocol(
+  url: string,
+): 'flv' | 'hls' | 'rtc' | 'unknown' | 'whep' | 'ws-flv' | 'wss-flv' {
   if (!url) return 'unknown';
   const lower = url.toLowerCase();
 
-  // 命中 WHEP 特征
+  // 1. 命中 WHEP 特征 (Oryx 标准 WebRTC 网关)
   if (lower.includes('/whep/') || lower.includes('/whip-play/')) {
     return 'whep';
   }
 
-  // 命中 SRS RTC 特征
+  // 2. 命中 SRS 原生 RTC 特征
   if (lower.startsWith('webrtc://') || lower.startsWith('rtc://')) {
     return 'rtc';
+  }
+
+  // 3. 识别 WebSocket-FLV
+  if (lower.startsWith('ws://')) {
+    return 'ws-flv';
+  }
+  if (lower.startsWith('wss://')) {
+    return 'wss-flv';
+  }
+
+  // 4. 兼容 HLS (m3u8)
+  if (lower.includes('.m3u8')) {
+    return 'hls';
+  }
+
+  // 5. 兼容 HTTP-FLV
+  if (lower.includes('.flv')) {
+    return 'flv';
   }
 
   return 'unknown';

@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@vben-core/shared": "workspace:*",
+    "@vben/player-types": "workspace:*",
     "hls.js": "catalog:",
     "mpegts.js": "catalog:",
     "vue": "catalog:"

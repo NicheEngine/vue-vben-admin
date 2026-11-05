@@ -1,0 +1,27 @@
+{
+  "name": "@vben/auto-player",
+  "version": "1.0.0",
+  "homepage": "https://github.com/nicheengine/temple-engine-webapp",
+  "bugs": "https://github.com/nicheengine/temple-engine-webapp/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicheengine/temple-engine-webapp.git",
+    "directory": "external/auto-player"
+  },
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@vben/easy-player": "workspace:*",
+    "@vben/jessibuca-player": "workspace:*",
+    "@vben/live-player": "workspace:*",
+    "@vben/ossrs-player": "workspace:*",
+    "@vben/player-types": "workspace:*",
+    "vue": "catalog:"
+  }
+}
