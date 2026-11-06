@@ -239,9 +239,7 @@ async function loadApplicationPlugins(
     },
     {
       condition: vxeTableLazyImport,
-      plugins: async () => {
-        return [await viteVxeTableImportsPlugin()];
-      },
+      plugins: () => [viteVxeTableImportsPlugin()],
     },
     {
       condition: nitroMock,
