@@ -185,14 +185,6 @@ function handleVolumeChange(value: number) {
   }
 }
 
-function handleFullscreen() {
-  if (document.fullscreenElement) {
-    void player.exitFullscreen?.();
-  } else {
-    void player.requestFullscreen?.();
-  }
-}
-
 function handleClear() {
   isCleared.value = true;
   api.destroyPlayer();
@@ -344,14 +336,12 @@ onBeforeUnmount(() => {
 
     <PlayStatusPanel class="mb-4" :player="player" />
 
-    <!-- ✅ 替换：使用 PlayerControlCard -->
     <PlayerControlCard
       class="mb-4"
       :player="player"
       :is-cleared="isCleared"
       @toggle="handleToggle"
       @reload="handleReload"
-      @fullscreen="handleFullscreen"
       @clear="handleClear"
       @mute-change="handleMuteChange"
       @volume-change="handleVolumeChange"

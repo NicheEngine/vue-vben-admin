@@ -9,7 +9,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'clear' | 'fullscreen' | 'reload' | 'toggle'): void;
+  (e: 'clear' | 'reload' | 'toggle'): void;
   (e: 'scaleModeChange', mode: 0 | 1 | 2): void;
   (e: 'volumeChange', v: number): void;
   (e: 'muteChange', m: boolean): void;
@@ -20,6 +20,14 @@ const SCALE_MODE_LABELS: Record<0 | 1 | 2, string> = {
   1: '等比留黑边',
   2: '等比裁切',
 };
+
+function handleFullscreen() {
+  if (document.fullscreenElement) {
+    void props.player.exitFullscreen?.();
+  } else {
+    void props.player.requestFullscreen?.();
+  }
+}
 </script>
 
 <template>
@@ -29,7 +37,7 @@ const SCALE_MODE_LABELS: Record<0 | 1 | 2, string> = {
         {{ player.isPlaying.value && !props.isCleared ? '暂停' : '播放' }}
       </Button>
       <Button @click="emit('reload')">重新加载</Button>
-      <Button @click="emit('fullscreen')">全屏播放</Button>
+      <Button @click="handleFullscreen">全屏播放</Button>
       <Button @click="emit('clear')">清除画面</Button>
     </div>
 

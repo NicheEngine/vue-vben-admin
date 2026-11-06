@@ -63,6 +63,29 @@ export interface EasyPlayerState {
   showControlBar: boolean;
 }
 
+export interface EasyInternalPlayer {
+  easyPlayer?: {
+    tech_?: {
+      flvPlayer?: {
+        _transmuxer?: {
+          _controller?: {
+            _ioctl?: {
+              _speedSampler?: {
+                averageKBps?: number;
+              };
+            };
+          };
+        };
+      };
+      hlsPlayer?: {
+        bandwidthEstimate?: number;
+      };
+    };
+  };
+  $el?: HTMLElement;
+  video?: HTMLVideoElement;
+}
+
 export type EasyPlayerStoreState = EasyPlayerProps & EasyPlayerState;
 
 /** 事件回调 */

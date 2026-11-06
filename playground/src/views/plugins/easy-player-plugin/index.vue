@@ -169,14 +169,6 @@ function handleRetry() {
   }
 }
 
-function handleFullscreen() {
-  if (document.fullscreenElement) {
-    void player.exitFullscreen?.();
-  } else {
-    void player.requestFullscreen?.();
-  }
-}
-
 function handleMuteChange(checked: boolean) {
   config.muted = checked;
   api.setMuted(checked);
@@ -329,7 +321,6 @@ onBeforeUnmount(() => {
         :is-cleared="isCleared"
         @toggle="handleToggle"
         @reload="handleReload"
-        @fullscreen="handleFullscreen"
         @clear="handleClear"
         @mute-change="handleMuteChange"
         @volume-change="handleVolumeChange"

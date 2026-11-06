@@ -26,16 +26,31 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
   let recordedChunks: Blob[] = [];
   let recordTimer: null | ReturnType<typeof setInterval> = null;
 
+  let lastErrorTime = 0;
+  const handleError = (msg: null | string) => {
+    if (!msg) return;
+    const now = Date.now();
+    if (now - lastErrorTime > 2000) {
+      error.value = msg;
+      lastErrorTime = now;
+    }
+  };
+
   const unsub = api.store.subscribe((state) => {
     isPlaying.value = state.isPlaying ?? false;
     isLoading.value = state.isLoading ?? false;
     isReady.value = state.isReady ?? false;
-    error.value = state.error ?? null;
     volume.value = state.volume ?? 1;
     isMuted.value = state.muted ?? false;
     currentTime.value = state.currentTime ?? 0;
     videoWidth.value = state.videoWidth ?? 0;
     videoHeight.value = state.videoHeight ?? 0;
+
+    if (state.error) {
+      handleError(state.error);
+    } else {
+      error.value = null;
+    }
 
     // 归一化 stats
     const normalized = normalizeStats(state.stats ?? {});
@@ -75,6 +90,7 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     setMuted: (m) => api.setMuted(m),
     setUrl: (u) => {
       error.value = null;
+      lastErrorTime = 0;
       if (!u) {
         isPlaying.value = false;
         isLoading.value = false;

@@ -215,14 +215,6 @@ function handleScreenshot(): string {
   return typeof result === 'string' ? result : '';
 }
 
-function handleFullscreen() {
-  if (document.fullscreenElement) {
-    void player.exitFullscreen?.();
-  } else {
-    void player.requestFullscreen?.();
-  }
-}
-
 function handleClear() {
   isCleared.value = true;
   api.pause();
@@ -379,7 +371,6 @@ onBeforeUnmount(() => {
         :is-cleared="isCleared"
         @toggle="handleToggle"
         @reload="handleReload"
-        @fullscreen="handleFullscreen"
         @clear="handleClear"
         @mute-change="handleMuteChange"
         @volume-change="handleVolumeChange"

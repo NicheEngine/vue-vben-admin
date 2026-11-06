@@ -18,6 +18,17 @@ export interface ProtocolInfo {
   description: string;
 }
 
+export function createDebounce<T extends (...args: any[]) => void>(
+  fn: T,
+  delay: number,
+) {
+  let timer: null | ReturnType<typeof setTimeout> = null;
+  return (...args: Parameters<T>) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
 export function detectProtocol(url: string): ProtocolInfo {
   const lower = url.trim().toLowerCase();
 

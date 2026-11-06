@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { IPlayerApi } from '@vben/player-types';
 
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import {
   Button,
@@ -19,6 +19,13 @@ const props = defineProps<{
   showStatus?: boolean;
   isCleared?: boolean;
 }>();
+
+const emit = defineEmits<{
+  (e: 'resize'): void;
+}>();
+
+const containerRef = ref<HTMLElement>();
+let resizeObserver: null | ResizeObserver = null;
 
 const sizeMode = ref<'auto' | 'fixed' | 'ratio'>('auto');
 const fixedWidth = ref(800);
@@ -96,6 +103,32 @@ const statusColor = computed(() => {
   if (p.isPlaying.value) return 'text-xs text-green-500';
   return 'text-xs text-foreground/50';
 });
+
+watch(sizeMode, () => {
+  setTimeout(() => emit('resize'), 100);
+});
+
+function handleFullscreenChange() {
+  emit('resize');
+}
+
+onMounted(() => {
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  if (containerRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      emit('resize');
+    });
+    resizeObserver.observe(containerRef.value);
+  }
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
+});
 </script>
 
 <template>
@@ -107,6 +140,7 @@ const statusColor = computed(() => {
     </template>
     <div class="flex justify-center w-full mb-6">
       <div
+        ref="containerRef"
         class="overflow-hidden rounded-xl border border-border bg-black relative"
         :style="containerStyle"
       >

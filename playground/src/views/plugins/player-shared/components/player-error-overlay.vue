@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from 'vue';
+
 import { Button } from 'antdv-next';
 
-defineProps<{
+const props = defineProps<{
   error: null | string;
   isReconnecting?: boolean;
 }>();
@@ -9,6 +11,47 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'retry'): void;
 }>();
+
+const countdown = ref(5);
+let timer: null | ReturnType<typeof setInterval> = null;
+
+function clearTimer() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+}
+
+function startCountdown() {
+  clearTimer();
+  countdown.value = 5;
+  timer = setInterval(() => {
+    if (countdown.value > 0) {
+      countdown.value--;
+    }
+    if (countdown.value === 0) {
+      clearTimer();
+      emit('retry');
+    }
+  }, 1000);
+}
+
+// ✅ 统一通过 watch 管理定时器，避免时序问题
+watch(
+  () => props.error,
+  (newError) => {
+    if (newError) {
+      startCountdown();
+    } else {
+      clearTimer();
+    }
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  clearTimer();
+});
 </script>
 
 <template>
@@ -50,7 +93,7 @@ const emit = defineEmits<{
         :loading="isReconnecting"
         @click="emit('retry')"
       >
-        {{ isReconnecting ? '正在重连...' : '点击重试' }}
+        {{ isReconnecting ? '正在重连...' : `点击重试 (${countdown}s)` }}
       </Button>
     </div>
   </div>

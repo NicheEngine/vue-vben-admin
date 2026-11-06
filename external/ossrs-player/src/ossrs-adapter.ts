@@ -174,6 +174,7 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
     },
 
     play: async () => {
+      error.value = null;
       if (!lastUrl) {
         api.toggle();
         return;

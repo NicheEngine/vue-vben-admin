@@ -1,6 +1,8 @@
 import type { EasyPlayerApi } from '@vben/easy-player';
 import type { IPlayerApi, PlayerStats } from '@vben/player-types';
 
+import type { EasyInternalPlayer } from './types';
+
 import { ref, watch } from 'vue';
 
 import { normalizeStats, safeUnsubscribe } from '@vben/player-types';
@@ -26,9 +28,34 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
   let mediaRecorder: MediaRecorder | null = null;
   let recordTimer: null | ReturnType<typeof setInterval> = null;
   let recordDrawTimer: null | ReturnType<typeof setInterval> = null;
+  let lastErrorTime = 0;
+
+  const handleError = (msg: unknown) => {
+    if (!msg) return;
+    let message: string;
+    if (msg instanceof Error) {
+      message = msg.message;
+    } else if (typeof msg === 'string') {
+      message = msg;
+    } else {
+      try {
+        message = JSON.stringify(msg);
+      } catch {
+        message = '发生未知错误';
+      }
+    }
+
+    if (!message || message === 'undefined') return;
+
+    const now = Date.now();
+    if (now - lastErrorTime > 2000) {
+      error.value = message;
+      lastErrorTime = now;
+    }
+  };
 
   const getVideo = (): HTMLVideoElement | null => {
-    const inst = api.getInstance() as any;
+    const inst = api.getInstance() as EasyInternalPlayer;
     return inst?.video || inst?.$el?.querySelector('video') || null;
   };
 
@@ -198,7 +225,6 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
     isPlaying.value = state.isPlaying ?? false;
     isLoading.value = state.isLoading ?? false;
     isReady.value = state.isReady ?? false;
-    error.value = state.error ?? null;
     volume.value = state.volume ?? 1;
     isMuted.value = state.muted ?? true;
     currentTime.value = state.currentTime ?? 0;
@@ -209,7 +235,12 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
       api.setControlBarVisible(state.showControlBar);
     }
 
-    // ✅ 严格以 isPlaying 为准，只在状态翻转时启动/停止
+    if (state.error) {
+      handleError(state.error);
+    } else {
+      error.value = null;
+    }
+
     if (state.isPlaying) {
       startStats();
     } else {
@@ -286,9 +317,12 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
     setMuted: (m) => api.setMuted(m),
     setUrl: (u) => {
       error.value = null;
+      lastErrorTime = 0;
       api.setUrl(u);
     },
     setUrlAsync: async (u) => {
+      error.value = null;
+      lastErrorTime = 0;
       return new Promise<void>((resolve) => {
         const timer = setTimeout(() => resolve(), 5000); // 5秒超时兜底
         // 监听 store 中的 isReady

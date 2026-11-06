@@ -27,6 +27,7 @@ export class OssrsPlayerApi {
 
   private callbacks: OssrsCallbacks = {};
   private componentCallbacks: OssrsCallbacks = {};
+  private lastErrorTime = 0;
   private loadTimeout: null | ReturnType<typeof setTimeout> = null;
   private mediaListeners: Array<{ event: string; fn: () => void }> = [];
   private player: AnyPlayer | null = null;
@@ -152,7 +153,7 @@ export class OssrsPlayerApi {
   public destroyPlayer() {
     this.playToken++;
     this.clearLoadTimeout();
-
+    this.lastErrorTime = 0;
     this.mediaListeners.forEach(({ event, fn }) => {
       this.videoElement?.removeEventListener(event, fn);
     });
@@ -209,7 +210,7 @@ export class OssrsPlayerApi {
     this.destroyPlayer();
     const token = ++this.playToken;
     this.playStarted = false;
-
+    this.lastErrorTime = 0;
     this.store.setState((prev) => ({
       ...prev,
       url,
@@ -324,6 +325,16 @@ export class OssrsPlayerApi {
         }
       };
 
+      if (p.pc) {
+        p.pc.addEventListener('connectionstatechange', () => {
+          if (token !== this.playToken) return;
+          const state = p.pc?.connectionState;
+          if (state === 'disconnected' || state === 'failed') {
+            this.setError(`WebRTC 连接${state === 'failed' ? '失败' : '断开'}`);
+          }
+        });
+      }
+
       if ('play' in p) {
         await p.play(targetUrl);
       }
@@ -336,13 +347,29 @@ export class OssrsPlayerApi {
   public setCallbacks(cb: OssrsCallbacks) {
     this.callbacks = { ...this.callbacks, ...cb };
   }
+
   public setComponentCallbacks(cb: OssrsCallbacks) {
     this.componentCallbacks = cb;
   }
-
   public setError(error: null | string) {
+    if (!error) {
+      this.store.setState((prev) => ({ ...prev, error: null }));
+      return;
+    }
+
+    if (this.store.state.isPlaying && this.store.state.videoWidth > 0) {
+      console.warn('[OssrsPlayerApi] 瞬时断连，忽略错误:', error);
+      return;
+    }
+
+    const now = Date.now();
+    if (now - this.lastErrorTime < 2000) {
+      return;
+    }
+    this.lastErrorTime = now;
+
     this.store.setState((prev) => ({ ...prev, error, isLoading: false }));
-    if (error) this.dispatch('onError', new Error(error));
+    this.dispatch('onError', new Error(error));
   }
 
   public setMuted(muted: boolean) {

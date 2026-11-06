@@ -1,11 +1,11 @@
 <script lang="ts" setup>
-import type { ProbeResult } from '../utils/protocol';
+import type { ProbeResult } from '../utils';
 
 import { computed, ref } from 'vue';
 
 import { Button, Input, Tag } from 'antdv-next';
 
-import { detectProtocol, probeUrl } from '../utils/protocol';
+import { detectProtocol, probeUrl } from '../utils';
 
 const props = withDefaults(
   defineProps<{

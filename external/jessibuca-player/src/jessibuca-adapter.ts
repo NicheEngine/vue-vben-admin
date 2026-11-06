@@ -23,6 +23,33 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
   const currentTime = ref(0);
   const videoWidth = ref(0);
   const videoHeight = ref(0);
+
+  let lastErrorTime = 0;
+  const handleError = (msg: unknown) => {
+    // 极严处理 unknown 类型
+    let message = '未知错误';
+    if (msg instanceof Error) {
+      message = msg.message;
+    } else if (typeof msg === 'string') {
+      message = msg;
+    } else if (msg !== null && msg !== undefined) {
+      // 针对对象等，安全转字符串
+      try {
+        message = JSON.stringify(msg);
+      } catch {
+        message = '未知对象错误';
+      }
+    }
+
+    if (!message || message === 'undefined') return;
+
+    const now = Date.now();
+    if (now - lastErrorTime > 2000) {
+      error.value = message;
+      lastErrorTime = now;
+    }
+  };
+
   // 劫持底层事件（单位统一为秒）
   const prev = api.getCallbacks();
   api.setCallbacks({
@@ -42,11 +69,11 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
       prev?.onLoad?.();
     },
     onError: (err) => {
-      console.error('[Jessibuca Adapter] 播放报错:', err);
+      handleError(err);
       prev?.onError?.(err);
     },
     onTimeout: (err) => {
-      console.error('[Jessibuca Adapter] 播放超时:', err);
+      handleError(err);
       prev?.onTimeout?.(err);
     },
     onStats: (s) => {
@@ -97,13 +124,18 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
     isPlaying.value = state.isPlaying ?? false;
     isLoading.value = state.isLoading ?? false;
     isReady.value = state.isReady ?? false;
-    error.value = state.error ?? null;
     volume.value = state.volume ?? 1;
     isMuted.value = state.muted ?? true;
     scaleMode.value = state.config.scaleMode ?? 1;
     currentTime.value = state.currentTime ?? 0;
     videoWidth.value = state.videoWidth ?? 0;
     videoHeight.value = state.videoHeight ?? 0;
+
+    if (state.error) {
+      handleError(state.error);
+    } else {
+      error.value = null;
+    }
   });
 
   return {
@@ -138,10 +170,13 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
     setMuted: (m) => (m ? api.mute() : api.cancelMute()),
     setUrl: (u) => {
       error.value = null;
+      lastErrorTime = 0;
       api.setUrl(u);
       void api.play();
     },
     setUrlAsync: async (u) => {
+      error.value = null;
+      lastErrorTime = 0;
       return new Promise((resolve) => {
         const timer = setTimeout(() => resolve(), 5000);
         const unwatch = watch(

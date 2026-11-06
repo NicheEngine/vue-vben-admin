@@ -16,11 +16,12 @@ export { default as ScreenshotPreview } from './components/screenshot-preview.vu
 // 2. 协议探测工具
 // ============================================================
 export {
+  createDebounce,
   detectOssrsProtocol,
   detectProtocol,
   probeUrl,
-} from './utils/protocol';
-export type { ProbeResult, ProtocolInfo } from './utils/protocol';
+} from './utils';
+export type { ProbeResult, ProtocolInfo } from './utils';
 // ============================================================
 // 4. Adapter 工厂 (直接转发)
 // ============================================================
