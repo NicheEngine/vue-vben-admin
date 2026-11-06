@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { IPlayerApi } from '../types';
+import type { IPlayerApi } from '@vben/player-types';
 
 import { Button, Card, Switch, Tag } from 'antdv-next';
 
@@ -73,10 +73,8 @@ const SCALE_MODE_LABELS: Record<0 | 1 | 2, string> = {
         {{ mode === 0 ? '拉伸' : mode === 1 ? '等比留黑边' : '等比裁切' }}
       </Button>
       <Tag color="blue">
-{{
-        SCALE_MODE_LABELS[player.scaleMode.value] ?? '未知'
-      }}
-</Tag>
+        {{ SCALE_MODE_LABELS[player.scaleMode.value] ?? '未知' }}
+      </Tag>
     </div>
 
     <!-- 插槽：允许各个页面插入自己特有的配置 -->

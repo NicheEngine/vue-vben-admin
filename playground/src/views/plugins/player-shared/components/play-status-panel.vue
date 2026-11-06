@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { IPlayerApi } from '../types';
+import type { IPlayerApi } from '@vben/player-types';
 
 import { Card, Tag } from 'antdv-next';
 
