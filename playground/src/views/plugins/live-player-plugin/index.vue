@@ -13,6 +13,7 @@ import {
   MultiScreenCompare,
   NetworkChart,
   PlayerControlCard,
+  PlayerErrorOverlay,
   PlayerSizeCard,
   PlayStatusPanel,
   ProtocolDetect,
@@ -66,9 +67,9 @@ const [Player, api] = useLivePlayer({
 
 const player = createLiveAdapter(api);
 
-// 真正断开流的状态控制
-const isPlayerDestroyed = ref(false);
+const isCleared = ref(false);
 const playerKey = ref(0);
+const showStatus = ref(true);
 
 const effectiveType = computed(() => {
   if (config.type) return config.type;
@@ -120,7 +121,7 @@ function applyUrl(u?: string) {
   if (!value) return;
   currentUrl.value = value;
   lastUrl.value = value;
-  isPlayerDestroyed.value = false;
+  isCleared.value = false;
   playerKey.value++;
 
   const history = urlHistory.value.filter((h) => h !== value);
@@ -133,17 +134,17 @@ function resetUrl() {
   currentUrl.value = DEFAULT_URL;
   lastUrl.value = DEFAULT_URL;
   urlHistory.value = [];
-  isPlayerDestroyed.value = false;
+  isCleared.value = false;
   playerKey.value++;
   api.pause();
   api.setUrl('');
 }
 
 function handleToggle() {
-  if (isPlayerDestroyed.value) {
+  if (isCleared.value) {
+    isCleared.value = false;
     if (lastUrl.value) {
       currentUrl.value = lastUrl.value;
-      isPlayerDestroyed.value = false;
       playerKey.value++;
       setTimeout(() => api.play(), 100);
     }
@@ -164,7 +165,7 @@ function handleToggle() {
 }
 
 function handleReload() {
-  isPlayerDestroyed.value = false;
+  isCleared.value = false;
   playerKey.value++;
 
   const target = currentUrl.value || lastUrl.value;
@@ -177,6 +178,16 @@ function handleReload() {
     api.play();
     setTimeout(() => api.setLoading?.(false), 500);
   }, 50);
+}
+
+function handleRetry() {
+  isCleared.value = false;
+  if (currentUrl.value) {
+    api.setError(null);
+    playerKey.value++;
+    api.setUrl(currentUrl.value);
+    setTimeout(() => api.play(), 100);
+  }
 }
 
 function handleMuteChange(checked: boolean) {
@@ -213,7 +224,7 @@ function handleFullscreen() {
 }
 
 function handleClear() {
-  isPlayerDestroyed.value = true;
+  isCleared.value = true;
   api.pause();
   api.updatePlaying(false);
 }
@@ -324,9 +335,12 @@ onBeforeUnmount(() => {
         class="mb-4"
         :video-width="player.videoWidth.value"
         :video-height="player.videoHeight.value"
+        :player="player"
+        :show-status="showStatus"
+        :is-cleared="isCleared"
       >
         <Player
-          v-if="!isPlayerDestroyed"
+          v-if="!isCleared"
           :key="playerKey"
           :url="currentUrl"
           :autoplay="config.autoplay"
@@ -334,32 +348,35 @@ onBeforeUnmount(() => {
           :muted="player.isMuted.value"
           :type="config.type"
           class="h-full w-full absolute inset-0"
-        >
-          <template #loading>
-            <span class="text-white">加载中...</span>
-          </template>
-          <template #error="{ error }">
-            <span>播放失败：{{ error }}</span>
-          </template>
-        </Player>
+        />
 
         <!-- 清除后的占位层 -->
         <div
-          v-else
+          v-if="!currentUrl && !isCleared"
+          class="absolute inset-0 flex items-center justify-center text-foreground/40 text-sm"
+        >
+          暂无视频源
+        </div>
+        <div
+          v-if="isCleared"
           class="absolute inset-0 bg-black flex items-center justify-center z-10"
         >
-          <span class="text-foreground/40 text-sm">画面已清除 (流已断开)</span>
+          <span class="text-foreground/40 text-sm">画面已清除</span>
         </div>
+        <PlayerErrorOverlay
+          :error="player.error.value"
+          :is-reconnecting="player.isLoading.value"
+          @retry="handleRetry"
+        />
       </PlayerSizeCard>
 
       <!-- ===== 播放状态面板 ===== -->
       <PlayStatusPanel class="mb-4" :player="player" />
 
-      <!-- ✅ 替换：使用 PlayerControlCard -->
       <PlayerControlCard
         class="mb-4"
         :player="player"
-        :is-cleared="isPlayerDestroyed"
+        :is-cleared="isCleared"
         @toggle="handleToggle"
         @reload="handleReload"
         @fullscreen="handleFullscreen"
@@ -393,6 +410,10 @@ onBeforeUnmount(() => {
                   { label: 'MPEGTS', value: LiveType.MPEGTS },
                 ]"
               />
+            </div>
+            <div class="flex items-center gap-2 whitespace-nowrap">
+              <span class="text-sm">状态标签：</span>
+              <Switch v-model:checked="showStatus" />
             </div>
           </div>
         </template>

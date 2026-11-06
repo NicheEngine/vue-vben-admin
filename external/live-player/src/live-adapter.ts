@@ -74,6 +74,7 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     setVolume: (v) => api.setVolume(v),
     setMuted: (m) => api.setMuted(m),
     setUrl: (u) => {
+      error.value = null;
       if (!u) {
         isPlaying.value = false;
         isLoading.value = false;

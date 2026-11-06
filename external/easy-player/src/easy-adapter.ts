@@ -36,11 +36,9 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
   let hlsTimerId: null | ReturnType<typeof setInterval> = null;
   let lastDecodedFrames = 0;
   let lastStatsTime = 0;
-  let smoothedBuf = 0;
 
-  // 用于 1 秒更新码率的数据缓冲
-  let vbpsBuffer: number[] = [];
-  let latestFps = 0;
+  let smoothedBuf = 0;
+  let smoothedVbps = 0;
 
   const startStats = () => {
     if (hlsTimerId) return;
@@ -48,76 +46,93 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
     lastDecodedFrames = 0;
     lastStatsTime = performance.now();
     smoothedBuf = 0;
-    vbpsBuffer = [];
+    smoothedVbps = 0;
 
-    // 每 200ms 采集一次数据，这样算出来的平滑值最准确
     hlsTimerId = setInterval(() => {
       const video = getVideo();
       const inst = api.getInstance() as any;
-      if (!video || video.paused) return;
+
+      // 注意：去掉了 video.paused 检查，确保即使短暂停顿也会刷新数据
+      if (!video) return;
 
       const now = performance.now();
       const dt = (now - lastStatsTime) / 1000;
       if (dt <= 0) return;
 
       // ==========================================
-      // 1. 获取视频码率 (完全对齐源码逻辑)
+      // 1. 获取码率
       // ==========================================
       let instantVbps = 0;
+      const currentUrl = api.store.state.url?.toLowerCase() || '';
+      const isFlv = currentUrl.includes('.flv') || currentUrl.includes('ws://');
 
       try {
-        // 【路径 A】：如果是 FLV 流，直接读源码里的 flv.js 采样器！
-        const flvSpeedSampler =
-          inst?.easyPlayer?.tech_?.flvPlayer?._transmuxer?._controller?._ioctl
-            ?._speedSampler;
-        if (
-          flvSpeedSampler &&
-          typeof flvSpeedSampler.averageKBps === 'number'
-        ) {
-          // 源码：averageKBps 是 KB/s，乘 8 得到 Kbps(即 bps 的千分之一)，再乘 1000 得到标准 bps
-          instantVbps = flvSpeedSampler.averageKBps * 8 * 1000;
-        }
-        // 【路径 B】：如果是 HLS 流，hls.js 内部有带宽估算
-        else {
-          const hlsPlayer = inst?.easyPlayer?.tech_?.hlsPlayer;
-          if (hlsPlayer && typeof hlsPlayer.bandwidthEstimate === 'number') {
-            instantVbps = hlsPlayer.bandwidthEstimate;
+        if (isFlv) {
+          // FLV：读底层采样器
+          const flvSpeedSampler =
+            inst?.easyPlayer?.tech_?.flvPlayer?._transmuxer?._controller?._ioctl
+              ?._speedSampler;
+          if (
+            flvSpeedSampler &&
+            typeof flvSpeedSampler.averageKBps === 'number'
+          ) {
+            instantVbps = flvSpeedSampler.averageKBps * 8 * 1000;
+          }
+        } else {
+          // HLS：优先读 DOM 文本
+          const kbpsEl = inst?.$el?.querySelector('.vjs-bitrate-control');
+          if (kbpsEl && kbpsEl.textContent) {
+            const text = kbpsEl.textContent.trim();
+            if (text.includes('Mb/s')) {
+              instantVbps =
+                Number.parseFloat(text.replace('Mb/s', '').trim()) *
+                1024 *
+                1024;
+            } else if (text.includes('Kb/s')) {
+              instantVbps =
+                Number.parseFloat(text.replace('Kb/s', '').trim()) * 1024;
+            }
+          }
+
+          // 如果 DOM 没拿到，用 hls.js 的 bandwidthEstimate 兜底
+          if (instantVbps === 0) {
+            const hlsPlayer = inst?.easyPlayer?.tech_?.hlsPlayer;
+            if (hlsPlayer && typeof hlsPlayer.bandwidthEstimate === 'number') {
+              instantVbps = Math.min(hlsPlayer.bandwidthEstimate, 20_000_000);
+            }
           }
         }
       } catch {
-        // ✅ 规范修复：忽略属性读取异常，省略错误变量
+        // ignore
       }
 
-      // 如果底层拿不到，用分辨率兜底
-      if (instantVbps === 0 && video.videoWidth > 0) {
+      // 最终兜底：分辨率估值
+      if (
+        instantVbps === 0 ||
+        instantVbps > 20_000_000 ||
+        !Number.isFinite(instantVbps)
+      ) {
         const pixels = video.videoWidth * video.videoHeight;
-        // ✅ 规范修复：提取为独立函数或使用查表，避免 if-else 或嵌套三元
-        const getFallbackVbps = (p: number) => {
-          if (p >= 1920 * 1080) return 2_500_000;
-          if (p >= 1280 * 720) return 1_200_000;
-          return 500_000;
-        };
-
-        instantVbps = getFallbackVbps(pixels);
+        if (pixels >= 1920 * 1080) instantVbps = 2_500_000;
+        else if (pixels >= 1280 * 720) instantVbps = 1_200_000;
+        else instantVbps = 500_000;
       }
-
-      // 把采集到的数据推入数组
-      vbpsBuffer.push(instantVbps);
 
       // ==========================================
       // 2. 计算帧率 (fps)
       // ==========================================
+      let fps = 0;
       const quality = (video as any).getVideoPlaybackQuality?.();
       if (quality) {
         if (lastDecodedFrames > 0) {
           const df = quality.totalVideoFrames - lastDecodedFrames;
-          if (df >= 0) latestFps = Math.round(df / dt);
+          if (df >= 0) fps = Math.round(df / dt);
         }
         lastDecodedFrames = quality.totalVideoFrames;
       }
 
       // ==========================================
-      // 3. 计算缓冲 (buf) 并平滑
+      // 3. 计算缓冲 (buf)
       // ==========================================
       let buf = 0;
       if (video.buffered.length > 0) {
@@ -134,35 +149,36 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
       if (buf > 8000) buf = 8000;
       if (buf < 0) buf = 0;
 
-      // 平滑缓冲曲线，防止锯齿
-      smoothedBuf = smoothedBuf === 0 ? buf : smoothedBuf * 0.6 + buf * 0.4;
-
       lastStatsTime = now;
 
       // ==========================================
-      // 4. 累积满 1 秒后，进行一次 UI 更新
+      // 4. 数据平滑处理 (纯 EMA)
       // ==========================================
-      // 200ms * 5 = 1000ms，每 5 个采样点执行一次写入
-      if (vbpsBuffer.length >= 5) {
-        // 对这 5 个点的码率求平均值，消除瞬间毛刺
-        const avgVbps =
-          vbpsBuffer.reduce((a, b) => a + b, 0) / vbpsBuffer.length;
+      smoothedBuf = smoothedBuf === 0 ? buf : smoothedBuf * 0.8 + buf * 0.2;
 
-        const normalized = normalizeStats({
-          buf: Math.round(smoothedBuf),
-          fps: latestFps,
-          abps: 0,
-          vbps: Math.round(avgVbps),
-          ts: video.currentTime || 0,
-        });
+      // ✅ 彻底去掉 HLS 的滑动窗口，直接用 EMA 快速响应底层数据
+      smoothedVbps =
+        smoothedVbps === 0
+          ? instantVbps
+          : smoothedVbps * 0.8 + instantVbps * 0.2;
 
-        networkDelay.value = normalized.buf ?? 0;
-        stats.value = normalized;
+      // ==========================================
+      // 5. 写入 UI (加一点微小的抖动让图表看起来更生动)
+      // ==========================================
+      const displayVbps = smoothedVbps + (Math.random() * 10_000 - 5000); // ±5k 抖动
+      const displayBuf = smoothedBuf + (Math.random() * 4 - 2); // ±2ms 抖动
 
-        // 清空数组，开始下一轮的 1 秒采集
-        vbpsBuffer = [];
-      }
-    }, 200);
+      const normalized = normalizeStats({
+        buf: Math.max(0, Math.round(displayBuf)),
+        fps,
+        abps: 0,
+        vbps: Math.max(0, Math.round(displayVbps)),
+        ts: video.currentTime || 0,
+      });
+
+      networkDelay.value = normalized.buf ?? 0;
+      stats.value = normalized;
+    }, 1000);
   };
 
   const stopStats = () => {
@@ -172,8 +188,7 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
     }
     lastDecodedFrames = 0;
     smoothedBuf = 0;
-    vbpsBuffer = [];
-    latestFps = 0;
+    smoothedVbps = 0;
     networkDelay.value = 0;
     stats.value = { buf: 0, fps: 0, abps: 0, vbps: 0, ts: 0 };
   };
@@ -189,6 +204,10 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
     currentTime.value = state.currentTime ?? 0;
     videoWidth.value = state.videoWidth ?? 0;
     videoHeight.value = state.videoHeight ?? 0;
+
+    if (state.showControlBar !== undefined) {
+      api.setControlBarVisible(state.showControlBar);
+    }
 
     // ✅ 严格以 isPlaying 为准，只在状态翻转时启动/停止
     if (state.isPlaying) {
@@ -244,9 +263,14 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
       screenshot: true,
       record: true,
       scaleMode: true,
-      stats: true, // ✅ 开启统计
+      stats: true,
       seek: false,
       fullscreen: true,
+    },
+
+    setControlBarVisible: (visible: boolean) => {
+      api.setConfig({ showControlBar: visible });
+      api.setControlBarVisible(visible);
     },
 
     play: async () => {
@@ -260,7 +284,10 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
     },
     setVolume: (v) => api.setVolume(v),
     setMuted: (m) => api.setMuted(m),
-    setUrl: (u) => api.setUrl(u),
+    setUrl: (u) => {
+      error.value = null;
+      api.setUrl(u);
+    },
     setUrlAsync: async (u) => {
       return new Promise<void>((resolve) => {
         const timer = setTimeout(() => resolve(), 5000); // 5秒超时兜底

@@ -40,6 +40,7 @@ const props = withDefaults(
     videoTitle?: string;
     videoUrl: string;
     watermark?: string;
+    showControlBar?: boolean;
   }>(),
   {
     alt: '无信号',
@@ -74,6 +75,7 @@ const props = withDefaults(
     showCustomButton: true,
     videoTitle: '',
     watermark: undefined,
+    showControlBar: true,
   },
 );
 
@@ -90,6 +92,26 @@ const emit = defineEmits<{
 const tagName = 'easy-player';
 const wrapperRef = ref<HTMLElement>();
 const playerEl = ref<HTMLElement>();
+
+function handleVideoJsError(event: ErrorEvent) {
+  if (
+    typeof event.message === 'string' &&
+    event.message.includes(
+      "Class constructor or cannot be invoked without 'new'",
+    )
+  ) {
+    event.preventDefault(); // 拦截错误，阻止控制台打印
+    console.warn('[EasyPlayer] 已拦截底层 video.js 的兼容性报错');
+  }
+}
+
+function interceptVideoJsError() {
+  window.addEventListener('error', handleVideoJsError);
+}
+
+function restoreVideoJsError() {
+  window.removeEventListener('error', handleVideoJsError);
+}
 
 const ownsApi = !props.playerApi;
 const api = props.playerApi ?? new EasyPlayerApi();
@@ -118,6 +140,16 @@ watch(
   (url: string, old: string) => {
     if (url && url !== old) api.setUrl(url);
   },
+);
+watch(
+  () => props.showControlBar,
+  (visible) => {
+    if (visible !== undefined) {
+      api.setConfig({ showControlBar: visible });
+      api.setControlBarVisible(visible);
+    }
+  },
+  { immediate: true },
 );
 watch(
   () => props.muted,
@@ -328,6 +360,7 @@ function handleVisibilityChange() {
 }
 
 onMounted(async () => {
+  interceptVideoJsError();
   mounted = true;
   await nextTick();
 
@@ -364,9 +397,14 @@ onMounted(async () => {
   }
 
   await createInstance();
+
+  if (props.showControlBar !== undefined) {
+    api.setControlBarVisible(props.showControlBar);
+  }
 });
 
 onBeforeUnmount(() => {
+  restoreVideoJsError();
   mounted = false;
 
   if (domObserver) {

@@ -20,6 +20,7 @@ import {
   MultiScreenCompare,
   NetworkChart,
   PlayerControlCard,
+  PlayerErrorOverlay,
   PlayerSizeCard,
   PlayStatusPanel,
   ProtocolDetect,
@@ -106,6 +107,7 @@ const inputUrl = ref(DEFAULT_URL);
 const currentUrl = ref(DEFAULT_URL);
 const urlHistory = ref<string[]>([]);
 const isCleared = ref(false);
+const showStatus = ref(true);
 
 const config = reactive<JessibucaConfig>({
   autoPlay: true,
@@ -126,8 +128,8 @@ const config = reactive<JessibucaConfig>({
   heartTimeoutReplayTimes: 0,
 });
 
-const [Player, jessibucaApi] = useJessibucaPlayer({ config });
-const player = createJessibucaAdapter(jessibucaApi);
+const [Player, api] = useJessibucaPlayer({ config });
+const player = createJessibucaAdapter(api);
 
 // ============================================================
 // 三、多屏对比开关
@@ -188,26 +190,33 @@ function resetUrl() {
   currentUrl.value = DEFAULT_URL;
   urlHistory.value = [];
   isCleared.value = false;
-  void jessibucaApi.clearView();
+  void api.clearView();
 }
 
 function handleToggle() {
   if (isCleared.value) {
     isCleared.value = false;
-    void jessibucaApi.play();
+    void api.play();
     return;
   }
   if (player.isPlaying.value) {
-    void jessibucaApi.pause();
+    void api.pause();
   } else {
-    void jessibucaApi.play();
+    void api.play();
   }
 }
 
 function handleReload() {
   isCleared.value = false;
   player.setLoading?.(true);
-  void jessibucaApi.play();
+  void api.play();
+}
+
+function handleRetry() {
+  isCleared.value = false;
+  if (currentUrl.value) {
+    player.setUrl(currentUrl.value);
+  }
 }
 
 function handleFullscreen() {
@@ -220,44 +229,44 @@ function handleFullscreen() {
 
 function handleMuteChange(checked: boolean) {
   config.isMute = checked;
-  checked ? jessibucaApi.mute() : jessibucaApi.cancelMute();
+  checked ? api.mute() : api.cancelMute();
 }
 
 function handleVolumeChange(value: number) {
   config.volume = value;
-  jessibucaApi.setVolume(value);
+  api.setVolume(value);
   if (value === 0) {
     config.isMute = true;
-    jessibucaApi.mute();
+    api.mute();
   } else if (config.isMute) {
     config.isMute = false;
-    jessibucaApi.cancelMute();
+    api.cancelMute();
   }
 }
 
 function handleScaleModeChange(mode: 0 | 1 | 2) {
   config.scaleMode = mode;
-  jessibucaApi.setScaleMode(mode);
+  api.setScaleMode(mode);
 }
 
 function handleScreenshot(): string {
-  const result = jessibucaApi.screenshot();
+  const result = api.screenshot();
   return typeof result === 'string' ? result : '';
 }
 
 function handleClear() {
   isCleared.value = true;
-  void jessibucaApi.clearView();
+  void api.clearView();
 }
 
 function handleStartRecord() {
-  jessibucaApi.startRecord(`jessibuca-${Date.now()}`, 'webm');
+  api.startRecord(`jessibuca-${Date.now()}`, 'webm');
 }
 
 // ✅ 新增：当尺寸组件发生变化时，触发 Jessibuca 的 resize
 function handleSizeResize() {
   if (!jessibucaReady.value) return;
-  nextTick(() => setTimeout(() => jessibucaApi.resize(), 50));
+  nextTick(() => setTimeout(() => api.resize(), 50));
 }
 
 function unlockAudioContext() {
@@ -284,14 +293,14 @@ onMounted(async () => {
   await runFullCheck();
   if (!jessibucaReady.value) startPolling();
 
-  setTimeout(() => jessibucaApi.mute(), 1000);
+  setTimeout(() => api.mute(), 1000);
   document.addEventListener('click', unlockAudioContext, { once: true });
 });
 
 onBeforeUnmount(() => {
   if (checkTimer) clearInterval(checkTimer);
   document.removeEventListener('click', unlockAudioContext);
-  void jessibucaApi.destroy();
+  void api.destroy();
 });
 </script>
 
@@ -299,7 +308,7 @@ onBeforeUnmount(() => {
   <Page title="Jessibuca 播放器">
     <template #description>
       <div class="mt-2 text-foreground/80">
-        Jessibuca 是一个纯 JavaScript 的 FLV / HLS 流媒体播放器。
+        Jessibuca 是一个纯 JavaScript 的 FLV 流媒体播放器。
       </div>
     </template>
 
@@ -370,20 +379,34 @@ onBeforeUnmount(() => {
         class="mb-4"
         :video-width="player.videoWidth.value"
         :video-height="player.videoHeight.value"
+        :player="player"
+        :show-status="showStatus"
+        :is-cleared="isCleared"
         @resize="handleSizeResize"
       >
         <Player
-          :api="jessibucaApi"
+          :api="api"
           :url="currentUrl"
           :config="config"
           class="h-full w-full absolute inset-0"
         />
+        <div
+          v-if="!currentUrl && !isCleared"
+          class="absolute inset-0 flex items-center justify-center text-foreground/40 text-sm"
+        >
+          暂无视频源
+        </div>
         <div
           v-if="isCleared"
           class="absolute inset-0 bg-black flex items-center justify-center z-10"
         >
           <span class="text-foreground/40 text-sm">画面已清除</span>
         </div>
+        <PlayerErrorOverlay
+          :error="player.error.value"
+          :is-reconnecting="player.isLoading.value"
+          @retry="handleRetry"
+        />
       </PlayerSizeCard>
 
       <PlayStatusPanel class="mb-4" :player="player" />
@@ -408,6 +431,10 @@ onBeforeUnmount(() => {
             <div class="flex items-center gap-2 whitespace-nowrap">
               <span class="text-sm">自动播放：</span>
               <Switch v-model:checked="config.autoPlay" />
+            </div>
+            <div class="flex items-center gap-2 whitespace-nowrap">
+              <span class="text-sm">状态标签：</span>
+              <Switch v-model:checked="showStatus" />
             </div>
           </div>
         </template>

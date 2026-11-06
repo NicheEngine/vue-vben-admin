@@ -149,7 +149,7 @@ export interface IPlayerApi {
   capabilities: PlayerCapabilities;
 
   // ===== 基础控制 =====
-
+  setControlBarVisible: (visible: boolean) => void;
   /** 开始播放 */
   play: () => Promise<void>;
   /** 暂停播放 */

@@ -136,7 +136,11 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
     toggle: () => api.toggle(),
     setVolume: (v) => api.setVolume(v),
     setMuted: (m) => (m ? api.mute() : api.cancelMute()),
-    setUrl: (u) => api.setUrl(u),
+    setUrl: (u) => {
+      error.value = null;
+      api.setUrl(u);
+      void api.play();
+    },
     setUrlAsync: async (u) => {
       return new Promise((resolve) => {
         const timer = setTimeout(() => resolve(), 5000);

@@ -37,6 +37,8 @@ export interface EasyPlayerProps {
   resolutionDefault?: EasyResolution;
   restartTime?: number;
   scaleMode?: 0 | 1 | 2;
+  /** 是否显示底部工具条，默认 true */
+  showControlBar?: boolean;
   /** 离屏继续播放（拦截滚动触发的自动暂停），默认 false */
   keepPlayingOffscreen?: boolean;
   showEnterprise?: boolean;
@@ -58,6 +60,7 @@ export interface EasyPlayerState {
   videoWidth: number;
   videoHeight: number;
   keepPlayingOffscreen: boolean;
+  showControlBar: boolean;
 }
 
 export type EasyPlayerStoreState = EasyPlayerProps & EasyPlayerState;

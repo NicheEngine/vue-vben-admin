@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { IPlayerApi } from '@vben/player-types';
+
 import { computed, ref } from 'vue';
 
 import {
@@ -13,6 +15,9 @@ import {
 const props = defineProps<{
   videoWidth?: number;
   videoHeight?: number;
+  player?: IPlayerApi;
+  showStatus?: boolean;
+  isCleared?: boolean;
 }>();
 
 const sizeMode = ref<'auto' | 'fixed' | 'ratio'>('auto');
@@ -71,11 +76,35 @@ const videoRatio = computed(() => {
   if (!props.videoWidth || !props.videoHeight) return '-';
   return (props.videoWidth / props.videoHeight).toFixed(2);
 });
+
+const statusText = computed(() => {
+  if (!props.showStatus) return '';
+  const p = props.player;
+  if (!p) return '';
+  if (p.isLoading.value) return '加载中...';
+  if (p.error.value) return `错误：${p.error.value}`;
+  if (p.isPlaying.value && !props.isCleared) return '播放中';
+  return '';
+});
+
+const statusColor = computed(() => {
+  if (!props.showStatus) return '';
+  const p = props.player;
+  if (!p) return '';
+  if (p.isLoading.value) return 'text-xs text-orange-500';
+  if (p.error.value) return 'text-xs text-red-500';
+  if (p.isPlaying.value) return 'text-xs text-green-500';
+  return 'text-xs text-foreground/50';
+});
 </script>
 
 <template>
   <Card class="mb-4" title="画面与尺寸">
-    <!-- ✅ 新增：直接在这里渲染播放器插槽 -->
+    <template #extra>
+      <span v-if="statusText" :class="statusColor">
+        {{ statusText }}
+      </span>
+    </template>
     <div class="flex justify-center w-full mb-6">
       <div
         class="overflow-hidden rounded-xl border border-border bg-black relative"
@@ -130,9 +159,9 @@ const videoRatio = computed(() => {
           fixedWidth = 1920;
           fixedHeight = 1080;
         "
-        >
-1920 × 1080
-</Button>
+      >
+        1920 × 1080
+      </Button>
     </div>
 
     <div

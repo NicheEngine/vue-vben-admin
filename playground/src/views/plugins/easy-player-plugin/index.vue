@@ -11,6 +11,7 @@ import {
   MultiScreenCompare,
   NetworkChart,
   PlayerControlCard,
+  PlayerErrorOverlay,
   PlayerSizeCard,
   PlayStatusPanel,
   ProtocolDetect,
@@ -66,6 +67,8 @@ const inputUrl = ref(DEFAULT_URL);
 const currentUrl = ref(DEFAULT_URL);
 const urlHistory = ref<string[]>([]);
 const isCleared = ref(false);
+const showStatus = ref(true);
+const showControlBar = ref(true);
 
 const config = reactive<{ autoplay: boolean; muted: boolean }>({
   autoplay: true,
@@ -157,6 +160,13 @@ function handleToggle() {
 function handleReload() {
   isCleared.value = false;
   if (currentUrl.value) api.replay();
+}
+
+function handleRetry() {
+  isCleared.value = false;
+  if (currentUrl.value) {
+    api.setUrl(currentUrl.value);
+  }
 }
 
 function handleFullscreen() {
@@ -272,14 +282,17 @@ onBeforeUnmount(() => {
         </div>
       </Card>
 
-      <!-- ✅ 替换：使用 PlayerSizeCard 包裹播放器 -->
       <PlayerSizeCard
         class="mb-4"
         :video-width="player.videoWidth.value"
         :video-height="player.videoHeight.value"
+        :player="player"
+        :show-status="showStatus"
+        :is-cleared="isCleared"
       >
         <Player
           v-if="currentUrl"
+          :show-control-bar="showControlBar"
           :player-api="api"
           :video-url="currentUrl"
           :scale-mode="player.scaleMode.value"
@@ -289,7 +302,7 @@ onBeforeUnmount(() => {
           class="h-full w-full absolute inset-0"
         />
         <div
-          v-if="!currentUrl"
+          v-if="!currentUrl && !isCleared"
           class="absolute inset-0 flex items-center justify-center text-foreground/40 text-sm"
         >
           暂无视频源
@@ -300,6 +313,11 @@ onBeforeUnmount(() => {
         >
           <span class="text-foreground/40 text-sm">画面已清除</span>
         </div>
+        <PlayerErrorOverlay
+          :error="player.error.value"
+          :is-reconnecting="player.isLoading.value"
+          @retry="handleRetry"
+        />
       </PlayerSizeCard>
 
       <PlayStatusPanel class="mb-4" :player="player" />
@@ -324,6 +342,14 @@ onBeforeUnmount(() => {
             <div class="flex items-center gap-2 whitespace-nowrap">
               <span class="text-sm">自动播放：</span>
               <Switch v-model:checked="config.autoplay" />
+            </div>
+            <div class="flex items-center gap-2 whitespace-nowrap">
+              <span class="text-sm">工具栏：</span>
+              <Switch v-model:checked="showControlBar" />
+            </div>
+            <div class="flex items-center gap-2 whitespace-nowrap">
+              <span class="text-sm">状态标签：</span>
+              <Switch v-model:checked="showStatus" />
             </div>
             <div class="flex items-center gap-2 whitespace-nowrap">
               <span class="text-sm">离屏继续播放：</span>

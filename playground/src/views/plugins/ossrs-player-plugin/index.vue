@@ -14,6 +14,7 @@ import {
   MultiScreenCompare,
   NetworkChart,
   PlayerControlCard,
+  PlayerErrorOverlay,
   PlayerSizeCard,
   PlayStatusPanel,
   ProtocolDetect,
@@ -28,6 +29,7 @@ const inputUrl = ref(DEFAULT_URL);
 const currentUrl = ref(DEFAULT_URL);
 const urlHistory = ref<string[]>([]);
 const isCleared = ref(false);
+const showStatus = ref(true);
 
 const config = reactive<OssrsPlayerProps>({
   autoplay: true,
@@ -147,7 +149,9 @@ function resetUrl() {
 function handleToggle() {
   if (isCleared.value) {
     isCleared.value = false;
-    if (currentUrl.value) api.play(currentUrl.value, config.protocol);
+    if (currentUrl.value) {
+      void api.play(currentUrl.value, config.protocol);
+    }
     return;
   }
   api.toggle();
@@ -156,6 +160,13 @@ function handleToggle() {
 function handleReload() {
   isCleared.value = false;
   if (currentUrl.value) api.play(currentUrl.value, config.protocol);
+}
+
+function handleRetry() {
+  isCleared.value = false;
+  if (currentUrl.value) {
+    void api.play(currentUrl.value, config.protocol);
+  }
 }
 
 function handleMuteChange(checked: boolean) {
@@ -299,6 +310,9 @@ onBeforeUnmount(() => {
       class="mb-4"
       :video-width="player.videoWidth.value"
       :video-height="player.videoHeight.value"
+      :player="player"
+      :show-status="showStatus"
+      :is-cleared="isCleared"
     >
       <Player
         :api="api"
@@ -310,11 +324,22 @@ onBeforeUnmount(() => {
         class="h-full w-full absolute inset-0"
       />
       <div
+        v-if="!currentUrl && !isCleared"
+        class="absolute inset-0 flex items-center justify-center text-foreground/40 text-sm"
+      >
+        暂无视频源
+      </div>
+      <div
         v-if="isCleared"
         class="absolute inset-0 bg-black flex items-center justify-center z-10"
       >
-        <span class="text-foreground/40 text-sm">画面已清除 (连接已断开)</span>
+        <span class="text-foreground/40 text-sm">画面已清除</span>
       </div>
+      <PlayerErrorOverlay
+        :error="player.error.value"
+        :is-reconnecting="player.isLoading.value"
+        @retry="handleRetry"
+      />
     </PlayerSizeCard>
 
     <PlayStatusPanel class="mb-4" :player="player" />
@@ -350,6 +375,10 @@ onBeforeUnmount(() => {
                 { label: 'WHEP', value: 'whep' },
               ]"
             />
+          </div>
+          <div class="flex items-center gap-2 whitespace-nowrap">
+            <span class="text-sm">状态标签：</span>
+            <Switch v-model:checked="showStatus" />
           </div>
         </div>
       </template>

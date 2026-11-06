@@ -50,6 +50,7 @@ function createDefaultState(): EasyPlayerStoreState {
     restartTime: 60 * 60 * 6,
     scaleMode: 1,
     keepPlayingOffscreen: false,
+    showControlBar: true,
     showEnterprise: true,
     showCustomButton: true,
     url: '',
@@ -255,6 +256,27 @@ export class EasyPlayerApi {
       if (STRUCTURAL_CONFIG_KEYS.has(key) && partial[key] !== prev[key]) {
         this.rebuildFlag = true;
         break;
+      }
+    }
+  }
+
+  public setControlBarVisible(visible: boolean) {
+    const inst = this.instance as any;
+    // video.js 的实例通常在 easyPlayer 上
+    const player = inst?.easyPlayer;
+    if (player && player.controlBar) {
+      if (visible) {
+        player.controlBar.show();
+      } else {
+        player.controlBar.hide();
+      }
+    } else {
+      // 兜底：如果底层拿不到实例，尝试通过 DOM 控制
+      const controlBar = this.containerEl?.querySelector(
+        '.vjs-control-bar',
+      ) as HTMLElement;
+      if (controlBar) {
+        controlBar.style.display = visible ? 'flex' : 'none';
       }
     }
   }

@@ -190,6 +190,7 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
     setMuted: (m) => api.setMuted(m),
 
     setUrl: (u) => {
+      error.value = null;
       lastUrl = u;
       if (u) {
         void api.play(u);

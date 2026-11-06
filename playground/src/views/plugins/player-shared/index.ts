@@ -7,7 +7,7 @@ export { default as NetworkChart } from './components/network-chart.vue';
 
 export { default as PlayStatusPanel } from './components/play-status-panel.vue';
 export { default as PlayerControlCard } from './components/player-control-card.vue';
-
+export { default as PlayerErrorOverlay } from './components/player-error-overlay.vue';
 export { default as PlayerSizeCard } from './components/player-size-card.vue';
 export { default as ProtocolDetect } from './components/protocol-detect.vue';
 export { default as RecordPanel } from './components/record-panel.vue';
