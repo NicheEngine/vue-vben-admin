@@ -3,8 +3,6 @@ import type { Ref } from 'vue';
 import type { JessibucaPlayerApi } from './jessibuca-player-api';
 
 export interface JessibucaConfig {
-  // ...（原有配置项保持不变，此处保留你文件中的全部字段）
-
   autoPlay?: boolean;
   isMute?: boolean;
   volume?: number;

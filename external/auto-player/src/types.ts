@@ -1,42 +1,10 @@
+import type { EasyPlayerApiOptions } from '@vben/easy-player';
+import type { JessibucaApiOptions } from '@vben/jessibuca-player';
+import type { LivePlayerApiOptions } from '@vben/live-player';
+import type { OssrsApiOptions } from '@vben/ossrs-player';
+import type { IPlayerApi } from '@vben/player-types';
+
 export type PlayerEngine = 'easy' | 'jessibuca' | 'live' | 'none' | 'ossrs';
-
-export interface AutoPlayerState {
-  isPlaying: boolean;
-  isLoading: boolean;
-  isReady: boolean;
-  error: null | string;
-  volume: number;
-  isMuted: boolean;
-  videoWidth: number;
-  videoHeight: number;
-  currentTime: number;
-  networkDelay: number;
-  stats: any;
-  isRecording: boolean;
-  recordingDuration: number;
-  activeEngine: PlayerEngine;
-}
-
-export interface AutoPlayerApi {
-  getActiveEngine: () => PlayerEngine;
-  getRawInstance: () => any;
-
-  play: () => Promise<void>;
-  pause: () => Promise<void>;
-  toggle: () => Promise<void>;
-  setVolume: (v: number) => void;
-  setMuted: (m: boolean) => void;
-  setUrl: (u: string) => void;
-  setScaleMode: (mode: 0 | 1 | 2) => void;
-  screenshot: (opts?: any) => Blob | string | undefined;
-  startRecord: () => void;
-  stopRecordAndSave: () => void;
-  requestFullscreen: () => Promise<void>;
-  exitFullscreen: () => Promise<void>;
-  destroy: () => Promise<void>;
-
-  state: AutoPlayerState;
-}
 
 export interface AutoPlayerProps {
   url: string;
@@ -44,6 +12,21 @@ export interface AutoPlayerProps {
   autoplay?: boolean;
   muted?: boolean;
   class?: string;
+
+  // 允许外部直接透传底层特定配置
+  easyOptions?: Partial<EasyPlayerApiOptions>;
+  jessibucaOptions?: Partial<JessibucaApiOptions>;
+  liveOptions?: Partial<LivePlayerApiOptions>;
+  ossrsOptions?: Partial<OssrsApiOptions>;
+}
+
+/**
+ * AutoPlayer 暴露的 API 严格遵循 IPlayerApi 契约，
+ * 并额外增加一个 getActiveEngine 和 getRawInstance 以便调试。
+ */
+export interface AutoPlayerApi extends IPlayerApi {
+  getActiveEngine: () => PlayerEngine;
+  getRawInstance: () => any;
 }
 
 export interface AutoPlayerExpose {
