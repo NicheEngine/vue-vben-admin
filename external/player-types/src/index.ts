@@ -279,11 +279,14 @@ export function normalizeStats(
 export function safeUnsubscribe(sub: unknown): void {
   if (!sub) return;
   try {
-    const s = sub;
-    if (typeof s === 'function') {
-      s();
-    } else if (typeof s.unsubscribe === 'function') {
-      s.unsubscribe();
+    if (typeof sub === 'function') {
+      sub();
+    } else if (
+      typeof sub === 'object' &&
+      'unsubscribe' in sub &&
+      typeof (sub as Record<string, unknown>).unsubscribe === 'function'
+    ) {
+      ((sub as Record<string, unknown>).unsubscribe as () => void)();
     }
   } catch (error) {
     console.warn('[player-types] safeUnsubscribe error:', error);
