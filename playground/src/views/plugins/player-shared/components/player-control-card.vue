@@ -39,6 +39,9 @@ function handleFullscreen() {
       <Button @click="emit('reload')">重新加载</Button>
       <Button @click="handleFullscreen">全屏播放</Button>
       <Button @click="emit('clear')">清除画面</Button>
+      <Button v-if="player.capabilities.pip" @click="player.togglePiP?.()">
+        画中画
+      </Button>
     </div>
 
     <div class="mt-4 flex flex-wrap items-center gap-4">

@@ -297,6 +297,19 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
       stats: true,
       seek: false,
       fullscreen: true,
+      pip: true,
+    },
+
+    togglePiP: async () => {
+      const video = getVideo();
+      if (!video) return;
+      try {
+        await (document.pictureInPictureElement
+          ? document.exitPictureInPicture()
+          : video.requestPictureInPicture());
+      } catch (error) {
+        console.warn('[EasyPlayer] 画中画切换失败:', error);
+      }
     },
 
     setControlBarVisible: (visible: boolean) => {

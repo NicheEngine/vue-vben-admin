@@ -216,6 +216,8 @@ export interface IPlayerApi {
 
   /** 返回底层 video 元素；不支持或未绑定时返回 `null` */
   getVideoElement?: () => HTMLVideoElement | null;
+  /** 切换画中画模式，如果 capabilities.pip 为 true 则必须实现 */
+  togglePiP?: () => Promise<void>;
 }
 
 // ============================================================

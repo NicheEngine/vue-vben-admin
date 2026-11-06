@@ -171,6 +171,19 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
       stats: true,
       seek: false,
       fullscreen: true,
+      pip: true,
+    },
+
+    togglePiP: async () => {
+      const video = api.video;
+      if (!video) return;
+      try {
+        await (document.pictureInPictureElement
+          ? document.exitPictureInPicture()
+          : video.requestPictureInPicture());
+      } catch (error) {
+        console.warn('[OSSRS] 画中画切换失败:', error);
+      }
     },
 
     play: async () => {

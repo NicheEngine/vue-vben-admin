@@ -161,6 +161,7 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
       stats: true,
       seek: false,
       fullscreen: true,
+      pip: false,
     },
 
     play: () => api.play(),
