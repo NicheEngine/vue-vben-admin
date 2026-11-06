@@ -238,13 +238,11 @@ function handleScreenshot(): string {
 }
 
 function handleFullscreen() {
-  const videoContainer = api.video?.parentElement;
-  if (!videoContainer) return;
-
+  // 统一标准化：直接调用 Adapter 的能力，无需再操作 DOM
   if (document.fullscreenElement) {
-    document.exitFullscreen().catch(console.warn);
+    void player.exitFullscreen?.();
   } else {
-    videoContainer.requestFullscreen().catch(console.warn);
+    void player.requestFullscreen?.();
   }
 }
 

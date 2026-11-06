@@ -1,7 +1,9 @@
 import type { LivePlayerApi } from '@vben/live-player';
 import type { IPlayerApi, PlayerStats } from '@vben/player-types';
 
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
+
+import { normalizeStats, safeUnsubscribe } from '@vben/player-types';
 
 export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
   const isPlaying = ref(api.store.state.isPlaying ?? false);
@@ -34,11 +36,12 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     currentTime.value = state.currentTime ?? 0;
     videoWidth.value = state.videoWidth ?? 0;
     videoHeight.value = state.videoHeight ?? 0;
-    networkDelay.value = state.networkDelay ?? 0;
-    stats.value = state.stats ?? {};
-  });
 
-  const getVideo = (): HTMLVideoElement | null => api.video;
+    // 归一化 stats
+    const normalized = normalizeStats(state.stats ?? {});
+    stats.value = normalized;
+    networkDelay.value = normalized.buf ?? 0;
+  });
 
   return {
     isPlaying,
@@ -70,10 +73,35 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     toggle: async () => api.toggle(),
     setVolume: (v) => api.setVolume(v),
     setMuted: (m) => api.setMuted(m),
-    setUrl: (u) => api.setUrl(u),
-
+    setUrl: (u) => {
+      if (!u) {
+        isPlaying.value = false;
+        isLoading.value = false;
+        isReady.value = false;
+        currentTime.value = 0;
+        networkDelay.value = 0;
+        stats.value = { buf: 0, fps: 0, abps: 0, vbps: 0, ts: 0 };
+      }
+      api.setUrl(u);
+    },
+    setUrlAsync: async (u) => {
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(), 5000);
+        const unwatch = watch(
+          () => api.store.state.isReady,
+          (ready) => {
+            if (ready) {
+              clearTimeout(timer);
+              unwatch();
+              resolve();
+            }
+          },
+        );
+        api.setUrl(u);
+      });
+    },
     destroy: async () => {
-      unsub.unsubscribe();
+      safeUnsubscribe(unsub);
       if (recordTimer) {
         clearInterval(recordTimer);
         recordTimer = null;
@@ -85,9 +113,12 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
       api.destroy();
     },
 
+    // 标准修复：直接暴露底层 api.video
+    getVideoElement: () => api.video,
+
     setScaleMode: (mode: 0 | 1 | 2) => {
       scaleMode.value = mode;
-      const video = getVideo();
+      const video = api.video;
       if (video) {
         const fitMap: Record<0 | 1 | 2, string> = {
           0: 'fill',
@@ -99,7 +130,7 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     },
 
     screenshot: (opts) => {
-      const video = getVideo();
+      const video = api.video;
       if (!video) return undefined;
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth || 1280;
@@ -111,7 +142,7 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     },
 
     startRecord: () => {
-      const video = getVideo();
+      const video = api.video;
       if (!video) return;
       const stream = (video as any).captureStream?.() as MediaStream;
       if (!stream) return;
@@ -146,6 +177,17 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
           recordTimer = null;
         }
       }
+    },
+
+    // 标准全屏实现
+    requestFullscreen: async () => {
+      const el = api.video?.parentElement;
+      if (el && !document.fullscreenElement) {
+        await el.requestFullscreen();
+      }
+    },
+    exitFullscreen: async () => {
+      if (document.fullscreenElement) await document.exitFullscreen();
     },
   };
 }

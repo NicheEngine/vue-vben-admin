@@ -43,9 +43,10 @@ function createDefaultState(): JessibucaStoreState {
     url: '',
     isPlaying: false,
     isLoading: false,
+    isReady: false,
     error: null,
     volume: 1,
-    isMuted: false,
+    muted: false,
     videoWidth: 0,
     videoHeight: 0,
     currentTime: 0,
@@ -109,6 +110,7 @@ export class JessibucaPlayerApi {
       onRecordStart,
       onRecordEnd,
       onRecording,
+      onTimeUpdate,
       initialUrl,
       initialConfig,
       initialState,
@@ -128,6 +130,7 @@ export class JessibucaPlayerApi {
       onRecordStart,
       onRecordEnd,
       onRecording,
+      onTimeUpdate,
     };
 
     const defaults = createDefaultState();
@@ -161,7 +164,7 @@ export class JessibucaPlayerApi {
     this.instance?.cancelMute();
     this.store.setState((prev) => ({
       ...prev,
-      isMuted: false,
+      muted: false,
       config: { ...prev.config, isMute: false },
     }));
   }
@@ -195,6 +198,16 @@ export class JessibucaPlayerApi {
       console.warn('[JessibucaPlayerApi] destroy error:', error);
     }
     this.instance = null;
+    this.store.setState((prev) => ({
+      ...prev,
+      isPlaying: false,
+      isReady: false,
+      isLoading: false,
+      error: null,
+      videoWidth: 0,
+      videoHeight: 0,
+      currentTime: 0,
+    }));
   }
 
   // ========== 配置 ==========
@@ -221,7 +234,7 @@ export class JessibucaPlayerApi {
     this.instance?.mute();
     this.store.setState((prev) => ({
       ...prev,
-      isMuted: true,
+      muted: true,
       config: { ...prev.config, isMute: true },
     }));
   }
@@ -250,8 +263,6 @@ export class JessibucaPlayerApi {
 
     this.syncUrlToInstance(url);
     this.updateLoading(true);
-    this.store.setState((prev) => ({ ...prev, error: null }));
-
     try {
       await this.instance.play(url);
     } catch (error: any) {
@@ -393,7 +404,13 @@ export class JessibucaPlayerApi {
    * 重播由组件 watch 或用户显式调用 play() 触发，避免双份触发源。
    */
   setUrl(url: string) {
-    this.store.setState((prev) => ({ ...prev, url, error: null }));
+    this.store.setState((prev) => ({
+      ...prev,
+      url,
+      isReady: false,
+      isLoading: true,
+      error: null,
+    }));
     this.syncUrlToInstance(url);
   }
 
@@ -443,6 +460,7 @@ export class JessibucaPlayerApi {
       play: () => {
         this.updatePlaying(true);
         this.updateLoading(false);
+        this.updateReady(true);
         this.dispatch('onPlay');
       },
       pause: () => {
@@ -450,14 +468,23 @@ export class JessibucaPlayerApi {
         this.dispatch('onPause');
       },
       loading: () => this.updateLoading(true),
-      load: () => this.dispatch('onLoad'),
+      load: () => {
+        this.updateReady(true);
+        this.dispatch('onLoad');
+      },
       videoInfo: (info: { width: number; height: number; encType: string }) => {
         this.store.setState((prev) => ({
           ...prev,
+          isReady: true,
           videoWidth: info.width,
           videoHeight: info.height,
         }));
         this.dispatch('onVideoInfo', info);
+      },
+      timeUpdate: (ts: number) => {
+        const seconds = ts / 1000;
+        this.store.setState((prev) => ({ ...prev, currentTime: seconds }));
+        this.dispatch('onTimeUpdate', seconds);
       },
       stats: (stats: {
         buf: number;
@@ -466,12 +493,14 @@ export class JessibucaPlayerApi {
         vbps: number;
         ts: number;
       }) => {
+        // ts 单位：Jessibuca 上报毫秒，统一为秒
         this.store.setState((prev) => ({
           ...prev,
-          networkDelay: stats.buf,
-          currentTime: stats.ts,
+          networkDelay: Math.max(0, Math.min(stats.buf || 0, 3000)),
+          // 移除 currentTime: tsSeconds
         }));
-        this.dispatch('onStats', stats);
+        // 注意：给用户层的 dispatch 依然保留原结构
+        this.dispatch('onStats', { ...stats, ts: stats.ts || 0 });
       },
       error: (error: Error | string) => {
         const message = error instanceof Error ? error.message : error;
@@ -486,7 +515,7 @@ export class JessibucaPlayerApi {
       mute: (isMuted: boolean) => {
         this.store.setState((prev) => ({
           ...prev,
-          isMuted,
+          muted: isMuted,
           config: { ...prev.config, isMute: isMuted },
         }));
         this.dispatch('onMute', isMuted);
@@ -576,6 +605,12 @@ export class JessibucaPlayerApi {
   private updatePlaying(playing: boolean) {
     if (this.store.state.isPlaying !== playing) {
       this.store.setState((prev) => ({ ...prev, isPlaying: playing }));
+    }
+  }
+
+  private updateReady(ready: boolean) {
+    if (this.store.state.isReady !== ready) {
+      this.store.setState((prev) => ({ ...prev, isReady: ready }));
     }
   }
 }

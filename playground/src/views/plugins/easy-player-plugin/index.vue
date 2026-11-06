@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
-import { EasyPlayer, useEasyPlayer } from '@vben/easy-player';
+import { useEasyPlayer } from '@vben/easy-player';
 
 import {
   Alert,
@@ -81,7 +81,7 @@ const config = reactive<{ autoplay: boolean; muted: boolean }>({
   muted: true,
 });
 
-const keepPlayingOffscreen = ref(false);
+const keepPlayingOffscreen = ref(true);
 
 const [Player, api] = useEasyPlayer({
   onError: (err: any) => {
@@ -90,8 +90,6 @@ const [Player, api] = useEasyPlayer({
 });
 
 const player = createEasyAdapter(api);
-
-const playerRef = ref<InstanceType<typeof EasyPlayer> | null>(null);
 
 // ============================================================
 // 三、响应式状态
@@ -216,19 +214,10 @@ function handleReload() {
 }
 
 function handleFullscreen() {
-  const el = (playerRef.value?.$el as HTMLElement)?.parentElement;
-  if (!el) {
-    if (document.fullscreenElement) api.exitFullscreen();
-    else api.fullscreen();
-    return;
-  }
-
   if (document.fullscreenElement) {
-    document.exitFullscreen().catch(console.warn);
+    void player.exitFullscreen?.();
   } else {
-    el.requestFullscreen().catch(() => {
-      api.fullscreen();
-    });
+    void player.requestFullscreen?.();
   }
 }
 
@@ -367,7 +356,6 @@ onBeforeUnmount(() => {
           >
             <Player
               v-if="currentUrl"
-              ref="playerRef"
               :player-api="api"
               :video-url="currentUrl"
               :scale-mode="player.scaleMode.value"

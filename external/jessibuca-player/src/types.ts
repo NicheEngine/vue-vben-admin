@@ -116,9 +116,10 @@ export interface JessibucaState {
   url: string;
   isPlaying: boolean;
   isLoading: boolean;
+  isReady: boolean;
   error: null | string;
   volume: number;
-  isMuted: boolean;
+  muted: boolean;
   videoWidth: number;
   videoHeight: number;
   currentTime: number;
@@ -173,6 +174,7 @@ export interface JessibucaCallbacks {
   onRecordStart?: () => void;
   onRecordEnd?: (blob: Blob) => void;
   onRecording?: (duration: number) => void;
+  onTimeUpdate?: (currentTime: number) => void;
 }
 
 export interface JessibucaApiOptions

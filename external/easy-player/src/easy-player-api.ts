@@ -142,7 +142,16 @@ export class EasyPlayerApi {
     this.instance = null;
     this.updatePlaying(false);
     this.updateReady(false);
-    this.store.setState((prev) => ({ ...prev, isLoading: false, error: null }));
+    this.store.setState((prev) => ({
+      ...prev,
+      isPlaying: false,
+      isReady: false,
+      isLoading: false,
+      error: null,
+      videoWidth: 0,
+      videoHeight: 0,
+      currentTime: 0,
+    }));
   }
 
   exitFullscreen() {
@@ -174,7 +183,12 @@ export class EasyPlayerApi {
 
   public play() {
     const video = this.containerEl?.querySelector('video');
-    this.store.setState((prev) => ({ ...prev, error: null, isLoading: false }));
+    this.store.setState((prev) => ({
+      ...prev,
+      error: null,
+      isLoading: true,
+      isReady: false,
+    }));
 
     if (video && video.paused) {
       video.play().catch((error) => console.warn('Play interrupted:', error));
@@ -278,6 +292,7 @@ export class EasyPlayerApi {
       ...p,
       error: null,
       isLoading: true,
+      isReady: false,
       url,
       videoUrl: url,
     }));

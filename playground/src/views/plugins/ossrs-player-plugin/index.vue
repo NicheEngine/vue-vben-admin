@@ -228,8 +228,12 @@ function handleVolumeChange(value: number) {
 }
 
 function handleFullscreen() {
-  if (document.fullscreenElement) void player.exitFullscreen?.();
-  else void player.requestFullscreen?.();
+  // 统一标准化：直接调用 Adapter 的能力，无需再操作 DOM
+  if (document.fullscreenElement) {
+    void player.exitFullscreen?.();
+  } else {
+    void player.requestFullscreen?.();
+  }
 }
 
 function handleClear() {

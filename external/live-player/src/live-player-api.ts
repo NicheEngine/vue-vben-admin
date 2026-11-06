@@ -145,6 +145,16 @@ export class LivePlayerApi {
       this.subscribe = null as any;
     }
     this.videoElement = null;
+    this.store.setState((prev) => ({
+      ...prev,
+      isPlaying: false,
+      isReady: false,
+      isLoading: false,
+      error: null,
+      videoWidth: 0,
+      videoHeight: 0,
+      currentTime: 0,
+    }));
   }
 
   public getCallbacks(): Readonly<LivePlayerApiOptions> {
@@ -152,12 +162,10 @@ export class LivePlayerApi {
   }
 
   pause() {
-    this.store.setState((prev) => ({ ...prev, isPlaying: false }));
     this.videoElement?.pause();
   }
 
   play() {
-    this.store.setState((prev) => ({ ...prev, isPlaying: true }));
     this.videoElement?.play().catch((error: unknown) => {
       console.warn('[LivePlayerApi] Play failed:', error);
       this.store.setState((prev) => ({
@@ -197,7 +205,20 @@ export class LivePlayerApi {
   }
 
   setUrl(url: string) {
-    this.store.setState((prev) => ({ ...prev, url, error: null }));
+    this.store.setState((prev) => ({
+      ...prev,
+      url,
+      error: null,
+      isLoading: !!url,
+      isReady: false,
+      isPlaying: false,
+    }));
+
+    if (!url && this.videoElement) {
+      this.videoElement.pause();
+      this.videoElement.removeAttribute('src');
+      this.videoElement.load();
+    }
   }
 
   setVolume(volume: number) {

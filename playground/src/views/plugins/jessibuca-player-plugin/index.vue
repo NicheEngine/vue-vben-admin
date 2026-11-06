@@ -243,23 +243,11 @@ function handleReload() {
 }
 
 function handleFullscreen() {
-  const wrapper = document.querySelector('.jessibuca-player-wrapper');
-  const el = wrapper?.parentElement;
-  if (!el) return;
-
+  // 统一标准化：直接调用 Adapter 的能力，无需再操作 DOM
   if (document.fullscreenElement) {
-    document
-      .exitFullscreen()
-      .then(() => {
-        nextTick(() => setTimeout(() => jessibucaApi.resize(), 100));
-      })
-      .catch(console.warn);
+    void player.exitFullscreen?.();
   } else {
-    el.requestFullscreen()
-      .then(() => {
-        nextTick(() => setTimeout(() => jessibucaApi.resize(), 100));
-      })
-      .catch(console.warn);
+    void player.requestFullscreen?.();
   }
 }
 

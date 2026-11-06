@@ -250,6 +250,7 @@ function bindVideoEvents(video: HTMLVideoElement) {
     if (video.videoWidth > 0 && video.videoHeight > 0) {
       api.updateVideoSize(video.videoWidth, video.videoHeight);
     }
+    api.updateReady(true);
   };
   const onError = () => {
     const msg = video.error?.message || '播放出错';

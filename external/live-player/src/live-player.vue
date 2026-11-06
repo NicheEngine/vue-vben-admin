@@ -159,25 +159,22 @@ function loadHls(resource: string, sid: number) {
     }
   });
 
+  let lastDecodedFrames = 0;
+  let lastStatsTime = 0;
   hlsTimer = setInterval(() => {
     if (sid === sessionId && isApiMode && hlsPlayer && videoRef.value) {
-      // 1. 码率获取 (沿用你的 lastRealVbps 或 bandwidthEstimate)
+      // 1. 码率：优先用 FRAG_LOADED 缓存值
       const vbps =
         lastRealVbps > 0
           ? lastRealVbps
           : (hlsPlayer as any).bandwidthEstimate || 0;
 
-      // 2. 👈 修复 HLS 缓冲过大：直接使用 HLS 底层的真实 latency
+      // 2. 缓冲：hls.js 底层 latency（直播边缘真实距离）
       let buf = 0;
-
-      // hls.js 内部有一个 latency 属性，代表了距离直播边缘的真实秒数
       const hlsLatency = (hlsPlayer as any).latency;
-
       if (hlsLatency !== undefined && hlsLatency !== null) {
-        // hlsLatency 单位是秒，转为毫秒
         buf = hlsLatency * 1000;
       } else {
-        // 兜底方案：使用 seekable 计算，但加上更严苛的截断
         try {
           if (videoRef.value.seekable && videoRef.value.seekable.length > 0) {
             const seekableEnd = videoRef.value.seekable.end(
@@ -189,20 +186,30 @@ function loadHls(resource: string, sid: number) {
           }
         } catch {}
       }
-
-      // 👈 如果是普通直播，HLS 延迟通常在 3~6 秒。这里限制上限为 8000ms。
-      // 如果超过 8000ms，说明推流端网络堆积严重，强制显示 8000ms 防止 UI 爆炸。
       if (buf > 8000) buf = 8000;
       if (buf < 0) buf = 0;
 
-      // 3. 增加抖动 (沿用刚才的 10% 抖动)
-      const jitterFactor = 0.9 + Math.random() * 0.2;
+      // 3. 帧率：用 getVideoPlaybackQuality 累计帧数差值
+      let fps = 0;
+      const now = performance.now();
+      const quality = (videoRef.value as any).getVideoPlaybackQuality?.();
+      if (quality && lastStatsTime > 0) {
+        const dt = (now - lastStatsTime) / 1000;
+        if (dt > 0 && lastDecodedFrames > 0) {
+          const df = quality.totalVideoFrames - lastDecodedFrames;
+          if (df >= 0) fps = Math.round(df / dt);
+        }
+        lastDecodedFrames = quality.totalVideoFrames;
+      } else if (quality) {
+        lastDecodedFrames = quality.totalVideoFrames;
+      }
+      lastStatsTime = now;
 
       api.updateStats({
-        buf: buf * jitterFactor,
-        fps: 30,
+        buf,
+        fps,
         abps: 0,
-        vbps: vbps * jitterFactor,
+        vbps,
         ts: videoRef.value.currentTime || 0,
       });
       api.updateVideoSize(
@@ -278,34 +285,39 @@ function loadMpegts(resource: string, sid: number) {
     }
   });
 
+  let lastDecodedFrames = 0;
+  let lastStatsTime = 0;
   player.on(Mpegts.Events.STATISTICS_INFO, (info: any) => {
     if (sid !== sessionId || !isApiMode) return;
 
-    // 1. 计算基础值
-    const rawVbps = (info.speed || 0) * 1024 * 8;
+    // 1. 码率
+    const vbps = (info.speed || 0) * 1024 * 8;
 
-    let rawBuf = 0;
+    // 2. 缓冲
+    let buf = 0;
     if (videoRef.value && videoRef.value.buffered.length > 0) {
       const curTime = videoRef.value.currentTime;
       const bufferedEnd = videoRef.value.buffered.end(
         videoRef.value.buffered.length - 1,
       );
-      rawBuf = Math.max(0, (bufferedEnd - curTime) * 1000);
-      if (rawBuf > 5000) rawBuf = 5000;
+      buf = Math.max(0, (bufferedEnd - curTime) * 1000);
+      if (buf > 8000) buf = 8000;
     }
 
-    // 2. 👈 核心新增：生成 0.9 ~ 1.1 的抖动系数
-    // 这样数据会在 90% 到 110% 之间波动，视觉上就有明显的跳动感
-    const jitterFactor = 0.9 + Math.random() * 0.2;
+    // 3. 帧率：decodedFrames 是累计值，用差值
+    let fps = 0;
+    const now = performance.now();
+    if (lastStatsTime > 0 && lastDecodedFrames > 0) {
+      const dt = (now - lastStatsTime) / 1000;
+      const df = (info.decodedFrames || 0) - lastDecodedFrames;
+      if (dt > 0 && df >= 0) fps = Math.round(df / dt);
+    }
+    lastDecodedFrames = info.decodedFrames || 0;
+    lastStatsTime = now;
 
-    const vbps = rawVbps * jitterFactor;
-    // 延迟也加上一点点微小抖动，让它也动起来
-    const buf = rawBuf * jitterFactor;
-
-    // 3. 更新给 UI
     api.updateStats({
       buf,
-      fps: info.decodedFrames || 30,
+      fps,
       abps: 0,
       vbps,
       ts: videoRef.value?.currentTime || 0,
@@ -325,6 +337,14 @@ function refresh() {
   const targetUrl = url.value;
   if (!targetUrl) {
     destroyLivePlayer();
+    if (isApiMode) {
+      setLoading(false);
+      api.updatePlaying(false);
+      api.updateReady(false);
+      videoRef.value.pause();
+      videoRef.value.removeAttribute('src');
+      videoRef.value.load();
+    }
     return;
   }
 

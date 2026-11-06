@@ -1,13 +1,18 @@
 import type { JessibucaPlayerApi } from '@vben/jessibuca-player';
 import type { IPlayerApi, PlayerStats } from '@vben/player-types';
 
-import { computed, ref } from 'vue';
+import { ref, watch } from 'vue';
+
+import { normalizeStats, safeUnsubscribe } from '@vben/player-types';
 
 export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
   const isPlaying = ref(api.store.state.isPlaying ?? false);
   const isLoading = ref(api.store.state.isLoading ?? false);
+  const isReady = ref(api.store.state.isReady ?? false);
+  const error = ref<null | string>(api.store.state.error ?? null);
+
   const volume = ref(api.store.state.volume ?? 1);
-  const isMuted = ref(api.store.state.isMuted ?? true);
+  const isMuted = ref(api.store.state.muted ?? true);
   const scaleMode = ref(api.store.state.config.scaleMode ?? 1);
 
   const isRecording = ref(false);
@@ -18,14 +23,14 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
   const currentTime = ref(0);
   const videoWidth = ref(0);
   const videoHeight = ref(0);
-
-  // 劫持底层事件（修复：将 ts 转为秒，并限制 buf 的合理范围）
+  // 劫持底层事件（单位统一为秒）
   const prev = api.getCallbacks();
   api.setCallbacks({
     ...prev,
     onPlay: () => {
       isPlaying.value = true;
       isLoading.value = false;
+      isReady.value = true;
       prev?.onPlay?.();
     },
     onPause: () => {
@@ -46,9 +51,17 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
     },
     onStats: (s) => {
       isLoading.value = false;
-      stats.value = { ...s };
-      networkDelay.value = Math.max(0, Math.min(s.buf || 0, 3000));
-      currentTime.value = (s.ts || 0) / 1000;
+      // 归一化：ts 秒，buf 裁剪
+      const normalized = normalizeStats({
+        buf: s.buf,
+        fps: s.fps,
+        abps: s.abps,
+        vbps: s.vbps,
+        ts: (s.ts || 0) / 1000, // ms → s
+      });
+      stats.value = normalized;
+      networkDelay.value = normalized.buf ?? 0;
+      currentTime.value = normalized.ts ?? 0;
       prev?.onStats?.(s);
     },
     onVideoInfo: (info) => {
@@ -69,25 +82,35 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
       recordingDuration.value = d;
       prev?.onRecording?.(d);
     },
+    onTimeUpdate: (seconds: number) => {
+      currentTime.value = seconds;
+      prev?.onTimeUpdate?.(seconds);
+    },
+    onMute: (isMute: boolean) => {
+      isMuted.value = isMute;
+      prev?.onMute?.(isMute);
+    },
   });
 
   // 同步底层 store 变化
   const unsub = api.store.subscribe((state) => {
-    isPlaying.value = state.isPlaying;
-    volume.value = state.volume;
-    isMuted.value = state.isMuted;
+    isPlaying.value = state.isPlaying ?? false;
+    isLoading.value = state.isLoading ?? false;
+    isReady.value = state.isReady ?? false;
+    error.value = state.error ?? null;
+    volume.value = state.volume ?? 1;
+    isMuted.value = state.muted ?? true;
     scaleMode.value = state.config.scaleMode ?? 1;
-    if (state.isLoading !== undefined) {
-      isLoading.value = state.isLoading;
-    }
+    currentTime.value = state.currentTime ?? 0;
+    videoWidth.value = state.videoWidth ?? 0;
+    videoHeight.value = state.videoHeight ?? 0;
   });
 
   return {
     isPlaying,
     isLoading,
-    isReady: computed(() => !!api.getInstance() || isPlaying.value),
-    error: computed(() => api.store.state.error ?? null),
-
+    isReady,
+    error,
     volume,
     isMuted,
     scaleMode,
@@ -114,12 +137,30 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
     setVolume: (v) => api.setVolume(v),
     setMuted: (m) => (m ? api.mute() : api.cancelMute()),
     setUrl: (u) => api.setUrl(u),
-
-    // 👈 修复内存泄漏：在销毁时彻底断开订阅
+    setUrlAsync: async (u) => {
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(), 5000);
+        const unwatch = watch(
+          () => api.store.state.isReady,
+          (ready) => {
+            if (ready) {
+              clearTimeout(timer);
+              unwatch();
+              resolve();
+            }
+          },
+        );
+        api.setUrl(u);
+        void api.play();
+      });
+    },
     destroy: async () => {
-      unsub.unsubscribe();
+      safeUnsubscribe(unsub);
+      api.setCallbacks({});
       await api.destroy();
     },
+
+    getVideoElement: () => null, // Jessibuca 用 canvas，无 video 元素
 
     resize: () => api.resize(),
     screenshot: (opts) =>
@@ -130,6 +171,18 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
 
     setLoading: (loading: boolean) => {
       isLoading.value = loading;
+    },
+    requestFullscreen: async () => {
+      const inst = api.getInstance() as any;
+      if (inst && typeof inst.setFullscreen === 'function') {
+        inst.setFullscreen(true);
+      }
+    },
+    exitFullscreen: async () => {
+      const inst = api.getInstance() as any;
+      if (inst && typeof inst.setFullscreen === 'function') {
+        inst.setFullscreen(false);
+      }
     },
   };
 }

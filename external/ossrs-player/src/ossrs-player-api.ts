@@ -179,6 +179,7 @@ export class OssrsPlayerApi {
       isPlaying: false,
       isReady: false,
       isLoading: false,
+      error: null,
       videoWidth: 0,
       videoHeight: 0,
       currentTime: 0,
@@ -213,6 +214,7 @@ export class OssrsPlayerApi {
       ...prev,
       url,
       isLoading: true,
+      isReady: false,
       error: null,
     }));
     this.dispatch('onLoadStart');
@@ -362,8 +364,17 @@ export class OssrsPlayerApi {
   public toggle() {
     const video = this.videoElement;
     if (!video) return;
-    if (video.paused) video.play().catch(() => {});
-    else video.pause();
+    if (video.paused) {
+      video
+        .play()
+        .then(() =>
+          this.store.setState((prev) => ({ ...prev, isPlaying: true })),
+        )
+        .catch(() => {});
+    } else {
+      video.pause();
+      this.store.setState((prev) => ({ ...prev, isPlaying: false }));
+    }
   }
 
   private clearLoadTimeout() {

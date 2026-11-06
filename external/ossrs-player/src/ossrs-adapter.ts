@@ -3,19 +3,21 @@ import type { IPlayerApi, PlayerStats } from '@vben/player-types';
 
 import { ref } from 'vue';
 
+import { normalizeStats, safeUnsubscribe } from '@vben/player-types';
+
 export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
-  const isPlaying = ref(api.store.state.isPlaying);
-  const isLoading = ref(api.store.state.isLoading);
-  const isReady = ref(api.store.state.isReady);
-  const error = ref<null | string>(api.store.state.error);
-  const isMuted = ref(api.store.state.muted);
-  const volume = ref(api.store.state.volume);
-  const currentTime = ref(api.store.state.currentTime);
-  const videoWidth = ref(api.store.state.videoWidth);
-  const videoHeight = ref(api.store.state.videoHeight);
+  const isPlaying = ref(api.store.state.isPlaying ?? false);
+  const isLoading = ref(api.store.state.isLoading ?? false);
+  const isReady = ref(api.store.state.isReady ?? false);
+  const error = ref<null | string>(api.store.state.error ?? null);
+  const isMuted = ref(api.store.state.muted ?? true);
+  const volume = ref(api.store.state.volume ?? 1);
+  const currentTime = ref(api.store.state.currentTime ?? 0);
+  const videoWidth = ref(api.store.state.videoWidth ?? 0);
+  const videoHeight = ref(api.store.state.videoHeight ?? 0);
 
   const networkDelay = ref(0);
-  const stats = ref<PlayerStats>({ vbps: 0, buf: 0 });
+  const stats = ref<PlayerStats>({ buf: 0, fps: 0, abps: 0, vbps: 0, ts: 0 });
   const scaleMode = ref<0 | 1 | 2>(1);
 
   const isRecording = ref(false);
@@ -27,37 +29,40 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
   let lastUrl = '';
   let statsInterval: null | ReturnType<typeof setInterval> = null;
   let lastBytesReceived = 0;
-  let lastStatsTime = Date.now();
+  let lastStatsTime = 0;
+  let lastDecodedFrames = 0;
 
   const unsub = api.store.subscribe((state) => {
-    isPlaying.value = state.isPlaying;
-    isLoading.value = state.isLoading;
-    isReady.value = state.isReady;
-    error.value = state.error;
-    isMuted.value = state.muted;
-    volume.value = state.volume;
-    currentTime.value = state.currentTime;
-    videoWidth.value = state.videoWidth;
-    videoHeight.value = state.videoHeight;
+    isPlaying.value = state.isPlaying ?? false;
+    isLoading.value = state.isLoading ?? false;
+    isReady.value = state.isReady ?? false;
+    error.value = state.error ?? null;
+    volume.value = state.volume ?? 1;
+    isMuted.value = state.muted ?? true;
+    currentTime.value = state.currentTime ?? 0;
+    videoWidth.value = state.videoWidth ?? 0;
+    videoHeight.value = state.videoHeight ?? 0;
 
     if (state.isPlaying) startStats();
     else {
       stopStats();
       networkDelay.value = 0;
-      stats.value = { vbps: 0, buf: 0 };
+      stats.value = { buf: 0, fps: 0, abps: 0, vbps: 0, ts: 0 };
     }
   });
 
   const startStats = () => {
     if (statsInterval) return;
-    lastStatsTime = Date.now();
     lastBytesReceived = 0;
+    lastStatsTime = 0;
+    lastDecodedFrames = 0;
 
     statsInterval = setInterval(async () => {
       if (!isPlaying.value) return;
 
-      let finalDelay = -1;
+      let finalDelay = 0;
       let vbps = 0;
+      let fps = 0;
 
       try {
         const report = await api.getStats();
@@ -66,6 +71,7 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
           let jitter = -1;
           let jitterBufferDelay = -1;
           let currentBytesReceived = 0;
+          let currentDecodedFrames = 0;
 
           report.forEach((r: any) => {
             if (
@@ -78,6 +84,7 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
             if (r.type === 'inbound-rtp' && r.kind === 'video') {
               if (r.jitter) jitter = r.jitter;
               if (r.bytesReceived) currentBytesReceived = r.bytesReceived;
+              if (r.framesDecoded) currentDecodedFrames = r.framesDecoded;
               if (r.jitterBufferDelay && r.jitterBufferEmittedCount) {
                 jitterBufferDelay =
                   r.jitterBufferDelay / r.jitterBufferEmittedCount;
@@ -85,23 +92,31 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
             }
           });
 
-          const now = Date.now();
-          const duration = (now - lastStatsTime) / 1000;
+          const now = performance.now();
 
-          if (
-            lastBytesReceived > 0 &&
-            currentBytesReceived > 0 &&
-            duration > 0
-          ) {
-            const deltaBytes = currentBytesReceived - lastBytesReceived;
-            if (deltaBytes >= 0) vbps = (deltaBytes * 8) / duration;
+          // 码率：首帧只记基线，后续算差值
+          if (lastStatsTime > 0 && lastBytesReceived > 0) {
+            const dt = (now - lastStatsTime) / 1000;
+            if (dt > 0 && currentBytesReceived >= lastBytesReceived) {
+              vbps = ((currentBytesReceived - lastBytesReceived) * 8) / dt;
+            }
+          }
+          // 帧率：同样首帧记基线
+          if (lastStatsTime > 0 && lastDecodedFrames > 0) {
+            const dt = (now - lastStatsTime) / 1000;
+            if (dt > 0 && currentDecodedFrames >= lastDecodedFrames) {
+              fps = Math.round((currentDecodedFrames - lastDecodedFrames) / dt);
+            }
           }
 
-          if (currentBytesReceived > 0) {
+          // 更新基线（首帧或重连时重置）
+          if (currentBytesReceived > 0)
             lastBytesReceived = currentBytesReceived;
-            lastStatsTime = now;
-          }
+          if (currentDecodedFrames > 0)
+            lastDecodedFrames = currentDecodedFrames;
+          lastStatsTime = now;
 
+          // 延迟：优先 jitterBufferDelay，次选 jitter，最后 rtt
           if (jitterBufferDelay > 0) finalDelay = jitterBufferDelay * 1000;
           else if (jitter > 0) finalDelay = jitter * 1000;
           else if (rtt > 0) finalDelay = rtt * 1000;
@@ -110,12 +125,16 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
         /* ignore */
       }
 
-      // if (finalDelay <= 0) finalDelay = 25 + Math.random() * 10;
-      // if (vbps === 0) vbps = 2_000_000 + Math.random() * 100_000;
+      const normalized = normalizeStats({
+        buf: finalDelay,
+        fps,
+        abps: 0,
+        vbps,
+        ts: currentTime.value || 0,
+      });
 
-      if (finalDelay < 0) finalDelay = 0;
-      networkDelay.value = Math.round(finalDelay);
-      stats.value = { ...stats.value, buf: networkDelay.value, vbps };
+      networkDelay.value = normalized.buf ?? 0;
+      stats.value = normalized;
     }, 1000);
   };
 
@@ -124,6 +143,9 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
       clearInterval(statsInterval);
       statsInterval = null;
     }
+    lastBytesReceived = 0;
+    lastStatsTime = 0;
+    lastDecodedFrames = 0;
   };
 
   return {
@@ -169,12 +191,22 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
 
     setUrl: (u) => {
       lastUrl = u;
-      if (!u) {
+      if (u) {
+        void api.play(u);
+      } else {
         api.destroyPlayer();
         stopStats();
       }
     },
-
+    setUrlAsync: async (u) => {
+      lastUrl = u;
+      if (!u) {
+        api.destroyPlayer();
+        stopStats();
+        return;
+      }
+      await api.play(u);
+    },
     screenshot: (opts) => {
       const video = api.video;
       if (!video || !video.videoWidth) return undefined;
@@ -245,7 +277,7 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
 
     destroy: async () => {
       stopStats();
-      unsub.unsubscribe();
+      safeUnsubscribe(unsub);
 
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
@@ -266,12 +298,25 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
       lastUrl = '';
     },
 
+    getVideoElement: () => api.video,
+
     setScaleMode: (mode: 0 | 1 | 2) => {
       scaleMode.value = mode;
+      const video = api.video;
+      if (video) {
+        const fitMap: Record<0 | 1 | 2, string> = {
+          0: 'fill',
+          1: 'contain',
+          2: 'cover',
+        };
+        video.style.objectFit = fitMap[mode];
+      }
     },
     requestFullscreen: async () => {
       const el = api.video?.parentElement;
-      if (el && !document.fullscreenElement) await el.requestFullscreen();
+      if (el && !document.fullscreenElement) {
+        await el.requestFullscreen();
+      }
     },
     exitFullscreen: async () => {
       if (document.fullscreenElement) await document.exitFullscreen();
