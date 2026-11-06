@@ -1,73 +1,56 @@
 <script lang="ts" setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import type { Component } from 'vue';
 
-import { useJessibucaPlayer } from '@vben/jessibuca-player';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { Card } from 'antdv-next';
 
+export interface MultiScreenPlayer {
+  component: Component;
+  props: Record<string, any>;
+  onDestroy: () => Promise<void> | void;
+  label: string;
+  mode: number;
+}
+
 const props = withDefaults(
   defineProps<{
-    url: string;
+    players: MultiScreenPlayer[];
     width?: number | string;
     height: number | string;
+    title?: string;
   }>(),
   {
     width: '100%',
+    title: '多屏对比（缩放模式）',
   },
 );
 
-const modes = [
-  { mode: 0, label: '拉伸填满', scaleMode: 0 },
-  { mode: 1, label: '等比留黑边', scaleMode: 1 },
-  { mode: 2, label: '等比裁切', scaleMode: 2 },
-] as const;
-
-const players = modes.map(({ mode, label, scaleMode }) => {
-  const [Player, api] = useJessibucaPlayer({
-    config: {
-      autoPlay: true,
-      isMute: true,
-      decoder: '/jessibuca/decoder.js',
-      scaleMode,
-      isResize: true,
-      supportDblclickFullscreen: false,
-      useWebFullScreen: false,
-      enableRecording: false,
-      debug: false,
-      forceNoOffscreen: true,
-    },
-  });
-
-  return { Player, api, mode, label };
-});
-
-const renderStates = ref<boolean[]>([false, false, false]);
+const renderStates = ref<boolean[]>(props.players.map(() => false));
 const timers: Array<ReturnType<typeof setTimeout>> = [];
 
 onMounted(() => {
-  timers.push(
-    setTimeout(() => {
-      renderStates.value[0] = true;
-    }, 300),
-    setTimeout(() => {
-      renderStates.value[1] = true;
-    }, 1500),
-    setTimeout(() => {
-      renderStates.value[2] = true;
-    }, 3000),
-  );
+  // 错开渲染，防止同时初始化导致 CPU 或网络打满
+  const delays = [300, 1000, 1800];
+  props.players.forEach((_, i) => {
+    timers.push(
+      setTimeout(() => {
+        renderStates.value[i] = true;
+      }, delays[i] || 1800),
+    );
+  });
 });
 
 onBeforeUnmount(() => {
   timers.forEach((t) => clearTimeout(t));
-  players.forEach((p) => {
-    void p.api.destroy();
+  props.players.forEach((p) => {
+    void p.onDestroy();
   });
 });
 </script>
 
 <template>
-  <Card title="多屏对比（缩放模式）">
+  <Card :title="title">
     <div class="mb-3 text-xs text-foreground/60">
       同一路流，三种缩放模式并排对比。容器尺寸：{{ width }} × {{ height }}。
     </div>
@@ -91,12 +74,11 @@ onBeforeUnmount(() => {
                 : props.height,
           }"
         >
-          <template v-if="renderStates[index] && props.url">
+          <template v-if="renderStates[index]">
             <div class="absolute inset-0">
               <component
-                :is="p.Player"
-                :api="p.api"
-                :url="props.url"
+                :is="p.component"
+                v-bind="p.props"
                 class="h-full w-full"
               />
             </div>

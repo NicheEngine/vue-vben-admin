@@ -2230,6 +2230,9 @@ importers:
       '@vben/ossrs-player':
         specifier: workspace:*
         version: link:../external/ossrs-player
+      '@vben/player-types':
+        specifier: workspace:*
+        version: link:../external/player-types
       '@vben/plugins':
         specifier: workspace:*
         version: link:../packages/effects/plugins

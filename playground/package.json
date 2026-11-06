@@ -46,6 +46,7 @@
     "@vben/live-player": "workspace:*",
     "@vben/locales": "workspace:*",
     "@vben/ossrs-player": "workspace:*",
+    "@vben/player-types": "workspace:*",
     "@vben/plugins": "workspace:*",
     "@vben/preferences": "workspace:*",
     "@vben/request": "workspace:*",

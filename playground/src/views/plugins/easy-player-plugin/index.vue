@@ -4,28 +4,19 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { Page } from '@vben/common-ui';
 import { useEasyPlayer } from '@vben/easy-player';
 
-import {
-  Alert,
-  Button,
-  Card,
-  InputNumber,
-  Select,
-  Slider,
-  SpaceAddon,
-  SpaceCompact,
-  Switch,
-  Tag,
-} from 'antdv-next';
+import { Alert, Button, Card, Switch, Tag } from 'antdv-next';
 
 import {
   createEasyAdapter,
+  MultiScreenCompare,
   NetworkChart,
+  PlayerControlCard,
+  PlayerSizeCard,
   PlayStatusPanel,
   ProtocolDetect,
   RecordPanel,
   ScreenshotPreview,
 } from '../player-shared';
-import MultiScreenCompare from './components/multi-screen-compare.vue';
 
 defineOptions({ name: 'EasyPlayerPluginExample' });
 
@@ -92,93 +83,48 @@ const [Player, api] = useEasyPlayer({
 const player = createEasyAdapter(api);
 
 // ============================================================
-// 三、响应式状态
-// ============================================================
-const isPlaying = player.isPlaying;
-const volume = player.volume;
-const muted = player.isMuted;
-
-// ============================================================
-// 四、画面尺寸与比例控制
-// ============================================================
-type SizeMode = 'auto' | 'fixed' | 'ratio';
-const sizeMode = ref<SizeMode>('auto');
-const fixedWidth = ref(800);
-const fixedHeight = ref(450);
-
-const DEFAULT_RATIO = { label: '16 : 9（宽屏）', value: '16:9', w: 16, h: 9 };
-const ratioOptions = [
-  DEFAULT_RATIO,
-  { label: '4 : 3（传统）', value: '4:3', w: 4, h: 3 },
-  { label: '21 : 9（超宽）', value: '21:9', w: 21, h: 9 },
-  { label: '1 : 1（方形）', value: '1:1', w: 1, h: 1 },
-  { label: '9 : 16（竖屏）', value: '9:16', w: 9, h: 16 },
-  { label: '3 : 4（竖屏）', value: '3:4', w: 3, h: 4 },
-];
-const ratio = ref('16:9');
-const ratioBaseWidth = ref(960);
-
-const actualAspectRatio = computed(() => {
-  if (player.videoWidth.value > 0 && player.videoHeight.value > 0) {
-    return `${player.videoWidth.value} / ${player.videoHeight.value}`;
-  }
-  return '16 / 9';
-});
-
-const containerStyle = computed(() => {
-  if (sizeMode.value === 'fixed') {
-    return { width: `${fixedWidth.value}px`, height: `${fixedHeight.value}px` };
-  }
-  if (sizeMode.value === 'ratio') {
-    const opt =
-      ratioOptions.find((o) => o.value === ratio.value) ?? DEFAULT_RATIO;
-    const height = Math.round((ratioBaseWidth.value * opt.h) / opt.w);
-    return { width: `${ratioBaseWidth.value}px`, height: `${height}px` };
-  }
-  return {
-    width: '100%',
-    aspectRatio: actualAspectRatio.value,
-    maxHeight: '600px',
-  };
-});
-
-const containerRatio = computed(() => {
-  if (sizeMode.value === 'fixed') {
-    return fixedHeight.value
-      ? (fixedWidth.value / fixedHeight.value).toFixed(2)
-      : '-';
-  }
-  if (sizeMode.value === 'ratio') {
-    const opt =
-      ratioOptions.find((o) => o.value === ratio.value) ?? DEFAULT_RATIO;
-    return (opt.w / opt.h).toFixed(2);
-  }
-  return (player.videoWidth.value / player.videoHeight.value || 16 / 9).toFixed(
-    2,
-  );
-});
-
-const videoRatio = computed(() => {
-  if (!player.videoWidth.value || !player.videoHeight.value) return '-';
-  return (player.videoWidth.value / player.videoHeight.value).toFixed(2);
-});
-
-const SCALE_MODE_LABELS: Record<0 | 1 | 2, string> = {
-  0: '拉伸填满',
-  1: '等比留黑边',
-  2: '等比裁切',
-};
-const scaleModeLabel = computed(
-  () => SCALE_MODE_LABELS[player.scaleMode.value] ?? '未知',
-);
-
-// ============================================================
-// 五、多屏对比开关
+// 三、多屏对比开关
 // ============================================================
 const showMultiScreen = ref(false);
 
+const multiPlayers = computed(() => {
+  // 如果没开启，或者没有 URL，就不创建实例，节约资源
+  if (!showMultiScreen.value || !currentUrl.value) return [];
+
+  const modes = [
+    { mode: 0 as const, label: '拉伸填满', scaleMode: 0 },
+    { mode: 1 as const, label: '等比留黑边', scaleMode: 1 },
+    { mode: 2 as const, label: '等比裁切', scaleMode: 2 },
+  ] as const;
+
+  return modes.map(({ mode, label, scaleMode }) => {
+    const [Player, api] = useEasyPlayer({
+      autoplay: true,
+      muted: true,
+      videoUrl: currentUrl.value,
+      scaleMode,
+      hasAudio: false,
+      showEnterprise: false,
+      showCustomButton: false,
+      debug: false,
+    });
+
+    return {
+      component: Player,
+      props: {
+        'player-api': api,
+        'video-url': currentUrl.value,
+        'scale-mode': scaleMode,
+      },
+      onDestroy: () => api.destroy(),
+      mode,
+      label,
+    };
+  });
+});
+
 // ============================================================
-// 六、交互
+// 四、交互
 // ============================================================
 function applyUrl(u?: string) {
   const value = (u ?? inputUrl.value).trim();
@@ -221,10 +167,6 @@ function handleFullscreen() {
   }
 }
 
-function handleFullscreenChange() {
-  // 底层 ResizeObserver 会自动接管
-}
-
 function handleMuteChange(checked: boolean) {
   config.muted = checked;
   api.setMuted(checked);
@@ -257,18 +199,15 @@ function handleClear() {
 }
 
 // ============================================================
-// 七、生命周期
+// 五、生命周期
 // ============================================================
 onMounted(() => {
   easyPlayerReady.value = checkEasyPlayer();
   if (!easyPlayerReady.value) startPolling();
-
-  document.addEventListener('fullscreenchange', handleFullscreenChange);
 });
 
 onBeforeUnmount(() => {
   if (checkTimer) clearInterval(checkTimer);
-  document.removeEventListener('fullscreenchange', handleFullscreenChange);
   void player.destroy();
 });
 </script>
@@ -333,191 +272,67 @@ onBeforeUnmount(() => {
         </div>
       </Card>
 
-      <Card class="mb-4" title="播放器">
-        <template #extra>
-          <span v-if="player.isLoading.value" class="text-xs text-orange-500">
-            加载中...
-          </span>
-          <span v-else-if="player.error.value" class="text-xs text-red-500">
-            错误：{{ player.error.value }}
-          </span>
-          <span
-            v-else-if="player.isPlaying.value && !isCleared"
-            class="text-xs text-green-500"
-          >
-            播放中
-          </span>
-        </template>
-
-        <div class="flex justify-center w-full">
-          <div
-            class="overflow-hidden rounded-xl border border-border bg-black relative w-full"
-            :style="containerStyle"
-          >
-            <Player
-              v-if="currentUrl"
-              :player-api="api"
-              :video-url="currentUrl"
-              :scale-mode="player.scaleMode.value"
-              :keep-playing-offscreen="keepPlayingOffscreen"
-              :autoplay="config.autoplay"
-              :muted="muted"
-              class="h-full w-full absolute inset-0"
-            />
-            <div
-              v-if="!currentUrl"
-              class="absolute inset-0 flex items-center justify-center text-foreground/40 text-sm"
-            >
-              暂无视频源
-            </div>
-            <div
-              v-if="isCleared"
-              class="absolute inset-0 bg-black flex items-center justify-center z-10"
-            >
-              <span class="text-foreground/40 text-sm">画面已清除</span>
-            </div>
-          </div>
+      <!-- ✅ 替换：使用 PlayerSizeCard 包裹播放器 -->
+      <PlayerSizeCard
+        class="mb-4"
+        :video-width="player.videoWidth.value"
+        :video-height="player.videoHeight.value"
+      >
+        <Player
+          v-if="currentUrl"
+          :player-api="api"
+          :video-url="currentUrl"
+          :scale-mode="player.scaleMode.value"
+          :keep-playing-offscreen="keepPlayingOffscreen"
+          :autoplay="config.autoplay"
+          :muted="config.muted"
+          class="h-full w-full absolute inset-0"
+        />
+        <div
+          v-if="!currentUrl"
+          class="absolute inset-0 flex items-center justify-center text-foreground/40 text-sm"
+        >
+          暂无视频源
         </div>
-      </Card>
+        <div
+          v-if="isCleared"
+          class="absolute inset-0 bg-black flex items-center justify-center z-10"
+        >
+          <span class="text-foreground/40 text-sm">画面已清除</span>
+        </div>
+      </PlayerSizeCard>
 
       <PlayStatusPanel class="mb-4" :player="player" />
 
-      <Card class="mb-4" title="画面尺寸">
-        <div class="flex flex-wrap items-center gap-3">
-          <span class="text-sm">尺寸模式：</span>
-          <Select
-            v-model:value="sizeMode"
-            class="w-40"
-            :options="[
-              { label: '自适应', value: 'auto' },
-              { label: '固定宽高', value: 'fixed' },
-              { label: '固定比例', value: 'ratio' },
-            ]"
-          />
-          <span class="ml-2 text-xs text-foreground/50">
-            容器比例：{{ containerRatio }} | 视频比例：{{ videoRatio }}
-          </span>
-        </div>
-
-        <div
-          v-if="sizeMode === 'fixed'"
-          class="mt-4 flex flex-wrap items-center gap-3"
-        >
-          <span class="text-sm">宽：</span>
-          <SpaceCompact>
-            <InputNumber v-model:value="fixedWidth" :min="160" :max="3840" />
-            <SpaceAddon>px</SpaceAddon>
-          </SpaceCompact>
-          <span class="ml-2 text-sm">高：</span>
-          <SpaceCompact>
-            <InputNumber v-model:value="fixedHeight" :min="90" :max="2160" />
-            <SpaceAddon>px</SpaceAddon>
-          </SpaceCompact>
-          <Button
-            size="small"
-            @click="
-              () => {
-                fixedWidth = 1280;
-                fixedHeight = 720;
-              }
-            "
+      <!-- ✅ 替换：使用 PlayerControlCard -->
+      <PlayerControlCard
+        class="mb-4"
+        :player="player"
+        :is-cleared="isCleared"
+        @toggle="handleToggle"
+        @reload="handleReload"
+        @fullscreen="handleFullscreen"
+        @clear="handleClear"
+        @mute-change="handleMuteChange"
+        @volume-change="handleVolumeChange"
+        @scale-mode-change="handleScaleModeChange"
+      >
+        <template #extra>
+          <div
+            class="mt-4 flex flex-wrap items-center gap-6 border-t border-border pt-4"
           >
-            1280 × 720
-          </Button>
-          <Button
-            size="small"
-            @click="
-              () => {
-                fixedWidth = 1920;
-                fixedHeight = 1080;
-              }
-            "
-          >
-            1920 × 1080
-          </Button>
-        </div>
-
-        <div
-          v-if="sizeMode === 'ratio'"
-          class="mt-4 flex flex-wrap items-center gap-3"
-        >
-          <span class="text-sm">比例：</span>
-          <Select v-model:value="ratio" class="w-40" :options="ratioOptions" />
-          <span class="ml-2 text-sm">宽度：</span>
-          <SpaceCompact>
-            <InputNumber
-              v-model:value="ratioBaseWidth"
-              :min="160"
-              :max="3840"
-            />
-            <SpaceAddon>px</SpaceAddon>
-          </SpaceCompact>
-          <span class="text-xs text-foreground/50">高度按比例自动计算</span>
-        </div>
-        <div v-if="sizeMode === 'auto'" class="mt-2 text-xs text-foreground/50">
-          自适应模式：宽度 100%，高度根据视频源比例自动撑开。
-        </div>
-      </Card>
-
-      <Card class="mb-4" title="播放控制">
-        <div class="flex flex-wrap items-center gap-3">
-          <Button @click="handleToggle">
-            {{ isPlaying && !isCleared ? '暂停' : '播放' }}
-          </Button>
-          <Button @click="handleReload">重新加载</Button>
-          <Button @click="handleFullscreen">全屏播放</Button>
-          <Button @click="handleClear">清除画面</Button>
-        </div>
-
-        <div class="mt-4 flex flex-wrap items-center gap-4">
-          <div class="flex items-center gap-2 whitespace-nowrap">
-            <span class="text-sm">静音：</span>
-            <Switch :checked="muted" @change="handleMuteChange" />
+            <div class="flex items-center gap-2 whitespace-nowrap">
+              <span class="text-sm">自动播放：</span>
+              <Switch v-model:checked="config.autoplay" />
+            </div>
+            <div class="flex items-center gap-2 whitespace-nowrap">
+              <span class="text-sm">离屏继续播放：</span>
+              <Switch v-model:checked="keepPlayingOffscreen" />
+            </div>
+            <span class="text-xs text-foreground/50">开启后，滚动出屏幕将不会被底层自动暂停。</span>
           </div>
-          <div class="flex items-center gap-2 whitespace-nowrap">
-            <span class="text-sm shrink-0">音量：</span>
-            <Slider
-              class="w-40 shrink-0"
-              :min="0"
-              :max="1"
-              :step="0.01"
-              :value="volume"
-              @change="handleVolumeChange"
-            />
-            <span class="text-xs text-foreground/50 w-10 text-right shrink-0">
-              {{ Math.round(volume * 100) }}%
-            </span>
-          </div>
-        </div>
-
-        <div class="mt-4 flex flex-wrap items-center gap-3">
-          <span class="text-sm shrink-0">缩放模式：</span>
-          <Button
-            v-for="mode in [0, 1, 2]"
-            :key="mode"
-            :type="player.scaleMode.value === mode ? 'primary' : 'default'"
-            size="small"
-            @click="handleScaleModeChange(mode as 0 | 1 | 2)"
-          >
-            {{ mode === 0 ? '拉伸' : mode === 1 ? '等比留黑边' : '等比裁切' }}
-          </Button>
-          <Tag color="blue">{{ scaleModeLabel }}</Tag>
-        </div>
-
-        <div
-          class="mt-4 flex flex-wrap items-center gap-6 border-t border-border pt-4"
-        >
-          <div class="flex items-center gap-2 whitespace-nowrap">
-            <span class="text-sm">自动播放：</span>
-            <Switch v-model:checked="config.autoplay" />
-          </div>
-          <div class="flex items-center gap-2 whitespace-nowrap">
-            <span class="text-sm">离屏继续播放：</span>
-            <Switch v-model:checked="keepPlayingOffscreen" />
-          </div>
-          <span class="text-xs text-foreground/50">开启后，滚动出屏幕将不会被底层自动暂停。</span>
-        </div>
-      </Card>
+        </template>
+      </PlayerControlCard>
 
       <Card class="mb-4" title="网络质量实时曲线">
         <div
@@ -569,7 +384,7 @@ onBeforeUnmount(() => {
         </div>
         <MultiScreenCompare
           v-if="showMultiScreen"
-          :url="currentUrl"
+          :players="multiPlayers"
           :height="300"
         />
       </Card>
