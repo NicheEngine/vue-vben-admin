@@ -3,24 +3,41 @@ import type { ProbeResult } from '../utils';
 
 import { computed, ref } from 'vue';
 
-import { Button, Input, Tag } from 'antdv-next';
+import { Button, Input, Select, Tag } from 'antdv-next';
 
 import { detectProtocol, probeUrl } from '../utils';
+
+interface EngineOption {
+  type: string;
+  label: string;
+  available: boolean;
+}
 
 const props = withDefaults(
   defineProps<{
     modelValue: string;
-    placeholder?: string; // 👈 新增属性
+    placeholder?: string;
+    /** 可选引擎候选（按优先级排序），仅 auto-player 场景传入 */
+    engines?: EngineOption[];
+    /** 当前激活引擎，仅 auto-player 场景传入 */
+    activeEngine?: string;
+    /** 是否显示引擎选择下拉（默认 false，保持旧用法不显示） */
+    showEngineSelect?: boolean;
   }>(),
   {
-    placeholder: 'ws://...flv / http://...flv / https://...m3u8', // 默认占位符
+    placeholder: 'ws://...flv / http://...flv / https://...m3u8',
+    engines: () => [],
+    activeEngine: '',
+    showEngineSelect: false,
   },
 );
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
+  'update:activeEngine': [value: string];
   apply: [url: string];
   reset: [];
+  engineChange: [type: string];
 }>();
 
 const url = computed({
@@ -68,8 +85,26 @@ const info = computed(() => {
   }
   return detectProtocol(urlStr);
 });
+
 const probing = ref(false);
 const probeResult = ref<null | ProbeResult>(null);
+
+// 是否已探测（探测结果为非空）
+const probed = computed(() => probeResult.value !== null);
+
+// 引擎下拉显示条件：启用 + 有候选 + 已探测
+const showEngineSelector = computed(
+  () =>
+    props.showEngineSelect && (props.engines?.length ?? 0) > 0 && probed.value,
+);
+
+const engineSelectOptions = computed(() =>
+  (props.engines ?? []).map((e) => ({
+    label: e.available ? e.label : `${e.label}（不可用）`,
+    value: e.type,
+    disabled: !e.available,
+  })),
+);
 
 // 点击应用时，触发自动探测
 async function handleApply() {
@@ -101,6 +136,11 @@ function handleReset() {
   probeResult.value = null;
   emit('reset');
 }
+
+function handleEngineChange(value: string) {
+  emit('update:activeEngine', value);
+  emit('engineChange', value);
+}
 </script>
 
 <template>
@@ -124,7 +164,7 @@ function handleReset() {
       <span class="text-foreground/50">{{ info.description }}</span>
     </div>
 
-    <!-- 完整的探测结果展示 -->
+    <!-- 探测结果 + 引擎切换（探测后显示） -->
     <div
       v-if="probeResult"
       class="mt-2 flex flex-wrap items-center gap-2 text-sm"
@@ -142,6 +182,19 @@ function handleReset() {
       <span v-if="probeResult.error" class="ml-2 text-red-500">
         {{ probeResult.error }}
       </span>
+
+      <!-- 引擎切换：探测后显示 -->
+      <template v-if="showEngineSelector">
+        <span class="ml-2 text-sm whitespace-nowrap text-foreground/60">
+          引擎：
+        </span>
+        <Select
+          :value="activeEngine || undefined"
+          class="w-40"
+          :options="engineSelectOptions"
+          @change="handleEngineChange"
+        />
+      </template>
     </div>
   </div>
 </template>

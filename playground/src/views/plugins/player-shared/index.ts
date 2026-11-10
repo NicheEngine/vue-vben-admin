@@ -22,12 +22,13 @@ export {
   probeUrl,
 } from './utils';
 export type { ProbeResult, ProtocolInfo } from './utils';
+export type { EngineCandidate } from '@vben/auto-player';
 // ============================================================
 // 4. Adapter 工厂 (直接转发)
 // ============================================================
 export { createEasyAdapter } from '@vben/easy-player';
-export { createJessibucaAdapter } from '@vben/jessibuca-player';
 
+export { createJessibucaAdapter } from '@vben/jessibuca-player';
 export { createLiveAdapter } from '@vben/live-player';
 export { createOssrsAdapter } from '@vben/ossrs-player';
 // ============================================================

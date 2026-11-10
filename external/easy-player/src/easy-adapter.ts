@@ -328,7 +328,9 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApiFull {
       api.toggle();
     },
     setVolume: (v) => api.setVolume(v),
-    setMuted: (m) => api.setMuted(m),
+    setMuted: (m) => {
+      api.setMuted(m);
+    },
     setUrl: (u) => {
       error.value = null;
       lastErrorTime = 0;
@@ -343,21 +345,23 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApiFull {
       }
       return new Promise<void>((resolve) => {
         let done = false;
+        let unwatch: (() => void) | null = null;
         const finish = () => {
           if (done) return;
           done = true;
           clearTimeout(timer);
-          unwatch();
+          unwatch?.();
           resolve();
         };
         const timer = setTimeout(finish, 5000);
-        const unwatch = watch(
+        unwatch = watch(
           () => [api.store.state.isReady, api.store.state.error] as const,
           ([ready, err]) => {
             if (ready || err) finish();
           },
           { immediate: true },
         );
+        if (done) unwatch();
         api.setUrl(u);
       });
     },
@@ -439,6 +443,7 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApiFull {
 
     setScaleMode: (mode) => {
       scaleMode.value = mode;
+      api.setScaleMode(mode);
     },
 
     getVideoElement: () => getVideo(),

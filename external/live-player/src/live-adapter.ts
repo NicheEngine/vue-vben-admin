@@ -101,7 +101,6 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApiFull {
     pause: async () => api.pause(),
     toggle: async () => api.toggle(),
     setVolume: (v) => api.setVolume(v),
-    setMuted: (m) => api.setMuted(m),
     setUrl: (u) => {
       error.value = null;
       lastErrorTime = 0;
@@ -124,23 +123,30 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApiFull {
       }
       return new Promise<void>((resolve) => {
         let done = false;
+        let unwatch: (() => void) | null = null;
         const finish = () => {
           if (done) return;
           done = true;
           clearTimeout(timer);
-          unwatch();
+          unwatch?.();
           resolve();
         };
         const timer = setTimeout(finish, 5000);
-        const unwatch = watch(
+        unwatch = watch(
           () => [api.store.state.isReady, api.store.state.error] as const,
           ([ready, err]) => {
             if (ready || err) finish();
           },
           { immediate: true },
         );
+        if (done) unwatch();
         api.setUrl(u);
       });
+    },
+
+    setMuted: (m) => {
+      api.setMuted(m);
+      if (api.video) api.video.muted = m;
     },
     destroy: async () => {
       safeUnsubscribe(unsub);

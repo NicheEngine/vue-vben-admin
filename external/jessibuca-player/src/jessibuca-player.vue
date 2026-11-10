@@ -88,43 +88,47 @@ let mounted = false;
 async function createInstance() {
   await nextTick();
   if (!containerRef.value || instance) return;
-
   if (
     containerRef.value.clientWidth === 0 ||
     containerRef.value.clientHeight === 0
   ) {
+    console.warn('[JessComp] 容器尺寸为 0，延迟 100ms 重试');
     setTimeout(createInstance, 100);
     return;
   }
 
   const JessibucaConstructor = (window as any).Jessibuca;
   if (!JessibucaConstructor) {
-    console.error('[JessibucaPlayer] 未找到 window.Jessibuca');
+    console.error('[JessComp] window.Jessibuca 未找到');
     emit('error', new Error('Jessibuca 库未加载'));
     return;
   }
 
-  unlockAudioContext();
+  // 核心修复：从 api store 里获取正确的配置（包含 external 传进来的 scaleMode）
+  const currentScaleMode = api.store.state.config.scaleMode ?? 1;
 
-  const resolvedConfig = {
-    ...api.getResolvedConfig(),
+  const config = {
+    container: containerRef.value,
     isMute: true,
-    isNotMute: false,
+    videoBuffer: 0.2,
+    decoder: '/jessibuca/decoder.js',
+    loadingText: '加载中...',
+    scaleMode: currentScaleMode, // 👈 必须传给底层初始化！
   };
 
-  instance = new JessibucaConstructor({
-    container: containerRef.value,
-    ...resolvedConfig,
-  }) as unknown as JessibucaInstance;
+  try {
+    instance = new JessibucaConstructor(config) as unknown as JessibucaInstance;
+    api.bindInstance(instance);
+    api.clearRebuildFlag();
 
-  api.bindInstance(instance);
-
-  const initialScaleMode = api.store.state.config.scaleMode;
-  if (initialScaleMode !== undefined) {
-    instance.setScaleMode(initialScaleMode);
+    // 🔥 初始化后，立即应用一次 scaleMode 并 resize
+    if (currentScaleMode !== undefined) {
+      instance.setScaleMode(currentScaleMode);
+      instance.resize();
+    }
+  } catch (error) {
+    console.error('[JessComp] 💥 new Jessibuca 或 bindInstance 崩溃:', error);
   }
-
-  api.clearRebuildFlag();
 }
 
 async function destroyInstance() {
@@ -154,6 +158,16 @@ watch(
     if (!instance) await createInstance();
     if (api.store.state.config.autoPlay !== false) {
       await api.play();
+    }
+  },
+);
+
+watch(
+  () => props.config?.scaleMode,
+  (mode) => {
+    if (instance && mode !== undefined) {
+      instance.setScaleMode(mode);
+      instance.resize();
     }
   },
 );

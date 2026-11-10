@@ -1,18 +1,16 @@
 <script lang="ts" setup>
-import type { AutoPlayerExpose, PlayerEngine } from '@vben/auto-player';
+import { computed, onBeforeUnmount, ref } from 'vue';
 
-import type { IPlayerApi } from '../player-shared';
-
-import { computed, ref } from 'vue';
-
-import { AutoPlayer } from '@vben/auto-player';
+import { createAutoMultiScreenPlayers, useAutoPlayer } from '@vben/auto-player';
 import { Page } from '@vben/common-ui';
 
-import { Card, Select, Switch, Tag } from 'antdv-next';
+import { Card, Switch, Tag } from 'antdv-next';
 
 import {
+  MultiScreenCompare,
   NetworkChart,
   PlayerControlCard,
+  PlayerErrorOverlay,
   PlayerSizeCard,
   PlayStatusPanel,
   ProtocolDetect,
@@ -22,224 +20,182 @@ import {
 
 defineOptions({ name: 'AutoPlayerPluginExample' });
 
-// ============================================================
-// 1. 基础实例引用与 API 代理
-// ============================================================
-const autoPlayerRef = ref<AutoPlayerExpose | null>(null);
-
-// 直接获取 Proxy Api
-const activeProxyApi = computed<IPlayerApi | null>(() => {
-  return (autoPlayerRef.value?.api as unknown as IPlayerApi) || null;
-});
-
-// ✅ 核心修复：单独抽离出响应式的 capabilities 判断，防止 v-if 无法响应 Getter 的属性变化
-const canRecord = computed(() => {
-  return !!activeProxyApi.value?.capabilities?.record;
-});
-
-const canScreenshot = computed(() => {
-  return !!activeProxyApi.value?.capabilities?.screenshot;
-});
-
-// ============================================================
-// 2. 地址与配置
-// ============================================================
 const DEFAULT_URL = '';
 const inputUrl = ref(DEFAULT_URL);
 const currentUrl = ref(DEFAULT_URL);
 const urlHistory = ref<string[]>([]);
-
-const config = ref({ autoplay: true, muted: true });
-const forcedEngine = ref<PlayerEngine>('none');
-const showStatus = ref(true);
 const showMultiScreen = ref(false);
+const isCleared = ref(false);
+// ✅ 新增：当前激活引擎（与 ProtocolDetect 双向）
+const activeEngine = ref('');
 
-const engineOptions = [
-  { label: '自动识别', value: 'none' },
-  { label: '强制 OSSRS (WebRTC)', value: 'ossrs' },
-  { label: '强制 LivePlayer (HLS/FLV)', value: 'live' },
-  { label: '强制 Jessibuca (FLV)', value: 'jessibuca' },
-  { label: '强制 EasyPlayer (FLV)', value: 'easy' },
-];
-
-const activeEngineLabel = computed(() => {
-  const engine = autoPlayerRef.value?.api.getActiveEngine();
-  const map: Record<string, string> = {
-    ossrs: 'OSSRS (WebRTC)',
-    live: 'LivePlayer',
-    jessibuca: 'Jessibuca',
-    easy: 'EasyPlayer',
-    none: '无可用引擎',
-  };
-  return map[engine || 'none'];
+const [Player, api] = useAutoPlayer({
+  muted: true,
+  autoplay: true,
+  initialUrl: '',
 });
 
-// ============================================================
-// 3. 缩放模式配置
-// ============================================================
-const scaleMode = ref<0 | 1 | 2>(1);
-const SCALE_MODE_LABELS: Record<0 | 1 | 2, string> = {
-  0: '拉伸填满',
-  1: '等比留黑边',
-  2: '等比裁切',
-};
-const SCALE_MODE_FIT: Record<0 | 1 | 2, 'contain' | 'cover' | 'fill'> = {
-  0: 'fill',
-  1: 'contain',
-  2: 'cover',
-};
+const player = api;
+const engineType = computed(() => api.getEngineType());
+const chooserResult = computed(() => api.getChooserResult());
+// 新增：候选引擎（按 URL 优先级 + 资源可用性）
+const engineCandidates = computed(() => {
+  // 依赖 currentUrl 触发重算
+  void currentUrl.value;
+  return api.getCandidates();
+});
 
-// ============================================================
-// 4. 交互方法
-// ============================================================
+const multiPlayers = computed(() => {
+  if (!showMultiScreen.value || !currentUrl.value) return [];
+
+  // 🔥 将当前选中的引擎传给工厂函数
+  return createAutoMultiScreenPlayers(
+    currentUrl.value,
+    engineType.value as any, // 比如 'live'、'easy' 或 'jessibuca'
+  );
+});
+
 function applyUrl(u?: string) {
   const value = (u ?? inputUrl.value).trim();
   if (!value) return;
+  isCleared.value = false;
   currentUrl.value = value;
   const history = urlHistory.value.filter((h) => h !== value);
   history.unshift(value);
   urlHistory.value = history.slice(0, 10);
+  void api.setUrlAsync(value).then(() => {
+    // ✅ 同步实际选中引擎
+    activeEngine.value = api.getEngineType() ?? '';
+  });
 }
 
 function resetUrl() {
   inputUrl.value = DEFAULT_URL;
   currentUrl.value = DEFAULT_URL;
   urlHistory.value = [];
+  isCleared.value = false;
+  activeEngine.value = '';
+  void api.reset();
+}
+
+// 新增：手动切换引擎
+async function handleEngineChange(type: string) {
+  activeEngine.value = type;
+  await api.switchType(type as any);
 }
 
 function handleToggle() {
-  activeProxyApi.value?.toggle();
+  if (isCleared.value) {
+    isCleared.value = false;
+    void api.play();
+    return;
+  }
+  void api.toggle();
 }
 function handleReload() {
-  if (currentUrl.value) activeProxyApi.value?.setUrl(currentUrl.value);
+  isCleared.value = false;
+  void api.reload();
 }
-function handleFullscreen() {
-  activeProxyApi.value?.requestFullscreen?.();
+function handleRetry() {
+  isCleared.value = false;
+  void api.retry();
 }
 function handleClear() {
-  activeProxyApi.value?.destroy();
-}
-function handleMuteChange(checked: boolean) {
-  config.value.muted = checked;
-  activeProxyApi.value?.setMuted(checked);
-}
-function handleVolumeChange(v: number) {
-  activeProxyApi.value?.setVolume(v);
-  if (v === 0 && !config.value.muted) {
-    config.value.muted = true;
-    activeProxyApi.value?.setMuted(true);
-  } else if (v > 0 && config.value.muted) {
-    config.value.muted = false;
-    activeProxyApi.value?.setMuted(false);
-  }
-}
-function handleScaleModeChange(mode: 0 | 1 | 2) {
-  scaleMode.value = mode;
-  activeProxyApi.value?.setScaleMode?.(mode);
+  isCleared.value = true;
+  void api.clear();
 }
 function handleScreenshot(): string {
-  const result = activeProxyApi.value?.screenshot?.();
+  const result = player.screenshot();
   return typeof result === 'string' ? result : '';
 }
 
-// ============================================================
-// 5. 多屏对比
-// ============================================================
-const multiEngine = computed(() => {
-  return autoPlayerRef.value?.api.getActiveEngine() || 'none';
+onBeforeUnmount(() => {
+  void api.destroy();
 });
 </script>
 
 <template>
-  <Page title="AutoPlayer 终极联合播放器">
-    <!-- 播放地址与引擎 -->
-    <Card class="mb-4" title="播放地址与引擎">
-      <ProtocolDetect v-model="inputUrl" @apply="applyUrl" @reset="resetUrl" />
-      <div class="mt-4 flex flex-wrap items-center gap-4">
-        <div class="flex items-center gap-2">
-          <span class="text-sm">强制切换引擎：</span>
-          <Select
-            v-model:value="forcedEngine"
-            class="w-56"
-            :options="engineOptions"
-          />
-        </div>
-        <Tag color="blue">当前生效：{{ activeEngineLabel }}</Tag>
+  <Page title="AutoPlayer 统一播放器">
+    <template #description>
+      <div class="mt-2 text-foreground/80">
+        根据 URL 协议 / 编码 / 资源可用性自动选择引擎，支持手动切换。
+      </div>
+    </template>
+
+    <Card class="mb-4" title="播放地址">
+      <ProtocolDetect
+        v-model="inputUrl"
+        v-model:active-engine="activeEngine"
+        :engines="engineCandidates"
+        :show-engine-select="engineCandidates.length > 1"
+        @apply="applyUrl"
+        @reset="resetUrl"
+        @engine-change="handleEngineChange"
+      />
+      <div class="mt-2 flex flex-wrap items-center gap-3 text-xs">
+        <span class="text-foreground/50">当前地址：{{ currentUrl || '（空）' }}</span>
+        <Tag v-if="engineType" color="blue">引擎：{{ engineType }}</Tag>
+        <Tag v-if="chooserResult" color="green">{{ chooserResult.reason }}</Tag>
       </div>
     </Card>
 
-    <!-- 播放器主区域 -->
     <PlayerSizeCard
       class="mb-4"
-      :player="activeProxyApi as any"
-      :show-status="showStatus"
-      :video-width="activeProxyApi?.videoWidth.value || 0"
-      :video-height="activeProxyApi?.videoHeight.value || 0"
+      :video-width="player.videoWidth.value"
+      :video-height="player.videoHeight.value"
+      :player="player"
+      :show-status="true"
+      :is-cleared="isCleared"
     >
-      <AutoPlayer
-        ref="autoPlayerRef"
+      <Player
+        v-if="currentUrl && !isCleared"
         :url="currentUrl"
-        :prefer-engine="forcedEngine"
-        :autoplay="config.autoplay"
-        :muted="config.muted"
-        class="w-full h-full absolute inset-0"
+        :api="api"
+        class="absolute inset-0 h-full w-full"
       />
       <div
-        v-if="!currentUrl"
-        class="absolute inset-0 flex items-center justify-center text-foreground/40 text-sm"
+        v-if="!currentUrl && !isCleared"
+        class="absolute inset-0 flex items-center justify-center text-sm text-foreground/40"
       >
         暂无视频源
       </div>
+      <div
+        v-if="isCleared"
+        class="absolute inset-0 z-10 flex items-center justify-center bg-black"
+      >
+        <span class="text-sm text-foreground/40">画面已清除</span>
+      </div>
+      <PlayerErrorOverlay
+        :error="player.error.value"
+        :is-reconnecting="player.isLoading.value"
+        @retry="handleRetry"
+      />
     </PlayerSizeCard>
 
-    <!-- 状态面板 -->
-    <PlayStatusPanel
-      class="mb-4"
-      v-if="activeProxyApi"
-      :player="activeProxyApi"
-    />
+    <PlayStatusPanel class="mb-4" :player="player" />
 
-    <!-- 播放控制 -->
     <PlayerControlCard
       class="mb-4"
-      v-if="activeProxyApi"
-      :player="activeProxyApi"
-      :is-cleared="false"
+      :player="player"
+      :is-cleared="isCleared"
       @toggle="handleToggle"
       @reload="handleReload"
-      @fullscreen="handleFullscreen"
       @clear="handleClear"
-      @mute-change="handleMuteChange"
-      @volume-change="handleVolumeChange"
-      @scale-mode-change="handleScaleModeChange"
-    >
-      <template #extra>
-        <div
-          class="mt-4 flex flex-wrap items-center gap-6 border-t border-border pt-4"
-        >
-          <div class="flex items-center gap-2 whitespace-nowrap">
-            <span class="text-sm">自动播放：</span>
-            <Switch v-model:checked="config.autoplay" />
-          </div>
-          <div class="flex items-center gap-2 whitespace-nowrap">
-            <span class="text-sm">显示状态标签：</span>
-            <Switch v-model:checked="showStatus" />
-          </div>
-        </div>
-      </template>
-    </PlayerControlCard>
+      @mute-change="(m) => api.setMuted(m)"
+      @volume-change="(v) => api.setVolume(v)"
+      @scale-mode-change="(m) => api.setScaleMode(m)"
+    />
 
-    <!-- 网络统计 -->
-    <Card class="mb-4" title="网络质量实时曲线" v-if="activeProxyApi">
+    <Card class="mb-4" title="网络质量实时曲线">
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
         <NetworkChart
-          :value="(activeProxyApi.stats.value?.vbps || 0) / 8 / 1024"
+          :value="(player.stats.value.vbps || 0) / 8 / 1024"
           label="实时码率"
           unit="kB/s"
           color="#22c55e"
         />
         <NetworkChart
-          :value="activeProxyApi.networkDelay.value || 0"
+          :value="player.networkDelay.value"
           label="网络延迟"
           unit="ms"
           color="#f59e0b"
@@ -247,50 +203,34 @@ const multiEngine = computed(() => {
       </div>
     </Card>
 
-    <!-- ✅ 修复：始终渲染面板，或者用 computed 判断 -->
-    <RecordPanel
-      v-if="canRecord"
-      class="mb-4"
-      :is-recording="activeProxyApi?.isRecording.value || false"
-      :recording-duration="activeProxyApi?.recordingDuration.value || 0"
-      :start-record="activeProxyApi?.startRecord || (() => {})"
-      :stop-record-and-save="activeProxyApi?.stopRecordAndSave || (() => {})"
-      :can-record="activeProxyApi?.isPlaying.value || false"
-    />
+    <template v-if="player.capabilities.record">
+      <RecordPanel
+        class="mb-4"
+        :is-recording="player.isRecording.value"
+        :recording-duration="player.recordingDuration.value"
+        :start-record="(n, t) => api.startRecord(n, t)"
+        :stop-record-and-save="() => api.stopRecordAndSave()"
+        :can-record="true"
+      />
+    </template>
 
-    <ScreenshotPreview
-      v-if="canScreenshot"
-      class="mb-4"
-      :capture="handleScreenshot"
-    />
+    <template v-if="player.capabilities.screenshot">
+      <ScreenshotPreview class="mb-4" :capture="handleScreenshot" />
+    </template>
 
-    <!-- 多屏对比 -->
     <Card class="mb-4" title="多屏对比">
-      <div class="mb-3 flex flex-wrap items-center gap-3">
+      <div class="mb-3 flex items-center gap-3">
         <span class="text-sm">启用：</span>
         <Switch
           :checked="showMultiScreen"
-          @change="(val) => (showMultiScreen = val)"
+          @change="(v) => (showMultiScreen = v)"
         />
       </div>
-      <div v-if="showMultiScreen" class="grid grid-cols-3 gap-4">
-        <div v-for="mode in [0, 1, 2]" :key="mode" class="flex flex-col gap-2">
-          <div class="text-sm text-foreground/70">
-            {{ SCALE_MODE_LABELS[mode as 0 | 1 | 2] }}
-          </div>
-          <div
-            class="relative overflow-hidden rounded border border-border bg-black h-[200px]"
-          >
-            <AutoPlayer
-              :url="currentUrl"
-              :prefer-engine="multiEngine"
-              :object-fit="SCALE_MODE_FIT[mode as 0 | 1 | 2]"
-              class="w-full h-full absolute inset-0"
-              :muted="true"
-            />
-          </div>
-        </div>
-      </div>
+      <MultiScreenCompare
+        v-if="showMultiScreen"
+        :players="multiPlayers"
+        :height="300"
+      />
     </Card>
   </Page>
 </template>

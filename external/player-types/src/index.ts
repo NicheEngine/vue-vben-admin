@@ -375,3 +375,57 @@ export function createFpsCounter(windowSize = 5) {
     },
   };
 }
+
+// ============================================================
+// URL 协议识别（纯函数，供 adapter / auto-player / UI 共用）
+// ============================================================
+
+/**
+ * 根据 URL 猜测流协议类型（纯逻辑，无 UI 文案）。
+ */
+export type StreamProtocol =
+  | 'hls'
+  | 'http-flv'
+  | 'https-flv'
+  | 'unknown'
+  | 'webrtc'
+  | 'whep'
+  | 'ws-flv'
+  | 'wss-flv';
+
+/** 根据 URL 猜测流协议类型（纯逻辑，不带 UI 文案） */
+export function detectProtocol(url: string): StreamProtocol {
+  const lower = url.trim().toLowerCase();
+
+  if (lower.includes('/whep/') || lower.includes('/whip-play/')) return 'whep';
+  if (lower.startsWith('webrtc://') || lower.startsWith('rtc://'))
+    return 'webrtc';
+  if (lower.startsWith('ws://')) return 'ws-flv';
+  if (lower.startsWith('wss://')) return 'wss-flv';
+  if (lower.includes('.m3u8')) return 'hls';
+  if (lower.startsWith('https://') && lower.includes('.flv'))
+    return 'https-flv';
+  if (lower.startsWith('http://') && lower.includes('.flv')) return 'http-flv';
+  if (lower.includes('.flv')) return 'http-flv';
+
+  return 'unknown';
+}
+
+/**
+ * 专门用于探测 SRS / Oryx 支持的协议类型（纯逻辑）。
+ */
+export function detectOssrsProtocol(
+  url: string,
+): 'flv' | 'hls' | 'rtc' | 'unknown' | 'whep' | 'ws-flv' | 'wss-flv' {
+  if (!url) return 'unknown';
+  const lower = url.toLowerCase();
+
+  if (lower.includes('/whep/') || lower.includes('/whip-play/')) return 'whep';
+  if (lower.startsWith('webrtc://') || lower.startsWith('rtc://')) return 'rtc';
+  if (lower.startsWith('ws://')) return 'ws-flv';
+  if (lower.startsWith('wss://')) return 'wss-flv';
+  if (lower.includes('.m3u8')) return 'hls';
+  if (lower.includes('.flv')) return 'flv';
+
+  return 'unknown';
+}

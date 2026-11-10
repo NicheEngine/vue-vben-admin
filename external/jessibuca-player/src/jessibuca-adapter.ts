@@ -171,7 +171,9 @@ export function createJessibucaAdapter(
     pause: () => api.pause(),
     toggle: () => api.toggle(),
     setVolume: (v) => api.setVolume(v),
-    setMuted: (m) => (m ? api.mute() : api.cancelMute()),
+    setMuted: (m) => {
+      return m ? api.mute() : api.cancelMute();
+    },
     setUrl: (u) => {
       error.value = null;
       lastErrorTime = 0;
@@ -187,21 +189,23 @@ export function createJessibucaAdapter(
       }
       return new Promise<void>((resolve) => {
         let done = false;
+        let unwatch: (() => void) | null = null;
         const finish = () => {
           if (done) return;
           done = true;
           clearTimeout(timer);
-          unwatch();
+          unwatch?.();
           resolve();
         };
         const timer = setTimeout(finish, 5000);
-        const unwatch = watch(
+        unwatch = watch(
           () => [api.store.state.isReady, api.store.state.error] as const,
           ([ready, err]) => {
             if (ready || err) finish();
           },
           { immediate: true },
         );
+        if (done) unwatch();
         api.setUrl(u);
         void api.play();
       });
@@ -263,7 +267,15 @@ export function createJessibucaAdapter(
       });
     },
     clear: async () => {
-      await (api as any).clearView?.();
+      // 引擎已销毁（切换引擎的过渡期），直接忽略
+      if (!api.getInstance()) {
+        return;
+      }
+      try {
+        await (api as any).clearView?.();
+      } catch (error) {
+        console.warn('[JessAdapter] clearView error ignored:', error);
+      }
     },
     retry: async () => {
       error.value = null;

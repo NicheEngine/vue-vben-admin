@@ -176,14 +176,41 @@ export class JessibucaPlayerApi {
   async clearView() {
     const inst = this.instance as any;
     if (!inst) return;
+
+    // 捕获当前实例引用，防止 await 期间被置空
+    const currentInstance = inst;
+
     try {
       // 先暂停，防止新帧覆盖清屏
-      await inst.pause?.();
-      inst.clearView?.();
+      await currentInstance.pause?.();
     } catch (error) {
-      console.warn('[JessibucaPlayerApi] clearView error:', error);
+      console.warn(
+        '[JessibucaPlayerApi] clearView pause error ignored:',
+        error,
+      );
+      return; // 暂停失败说明实例已废，直接退出
     }
-    this.updatePlaying(false);
+
+    // 关键：await 完之后再次校验实例是否还是刚才那个（可能已被销毁重建）
+    if (this.instance !== currentInstance) {
+      return;
+    }
+
+    try {
+      // 检查底层画布是否还存在（jessibuca 内部维护 video 属性）
+      if (!currentInstance.video) {
+        console.warn('[JessibucaPlayerApi] clearView 跳过：底层 video 已销毁');
+        return;
+      }
+      currentInstance.clearView?.();
+    } catch (error) {
+      console.warn('[JessibucaPlayerApi] clearView error ignored:', error);
+    }
+
+    // 确保没有重复更新状态
+    if (this.instance === currentInstance) {
+      this.updatePlaying(false);
+    }
   }
 
   public async destroy() {

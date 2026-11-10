@@ -3,7 +3,11 @@ import type { IPlayerApiFull, PlayerStats } from '@vben/player-types';
 
 import { ref, watch } from 'vue';
 
-import { normalizeStats, safeUnsubscribe } from '@vben/player-types';
+import {
+  detectOssrsProtocol,
+  normalizeStats,
+  safeUnsubscribe,
+} from '@vben/player-types';
 
 export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApiFull {
   const isPlaying = ref(api.store.state.isPlaying ?? false);
@@ -50,6 +54,10 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApiFull {
       stats.value = { buf: 0, fps: 0, abps: 0, vbps: 0, ts: 0 };
     }
   });
+
+  function resolveProtocol(url: string): 'rtc' | 'whep' {
+    return detectOssrsProtocol(url) === 'whep' ? 'whep' : 'rtc';
+  }
 
   const startStats = () => {
     if (statsInterval) return;
@@ -193,7 +201,7 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApiFull {
         api.toggle();
         return;
       }
-      await api.play(lastUrl);
+      await api.play(lastUrl, resolveProtocol(lastUrl));
     },
     pause: async () => {
       api.pause();
@@ -202,13 +210,15 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApiFull {
       api.toggle();
     },
     setVolume: (v) => api.setVolume(v),
-    setMuted: (m) => api.setMuted(m),
+    setMuted: (m) => {
+      api.setMuted(m);
+    },
 
     setUrl: (u) => {
       error.value = null;
       lastUrl = u;
       if (u) {
-        void api.play(u);
+        void api.play(u, resolveProtocol(u));
       } else {
         api.destroyPlayer();
         stopStats();
@@ -224,24 +234,27 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApiFull {
       }
       return new Promise<void>((resolve) => {
         let done = false;
+        let unwatch: (() => void) | null = null;
         const finish = () => {
           if (done) return;
           done = true;
           clearTimeout(timer);
-          unwatch();
+          unwatch?.();
           resolve();
         };
         const timer = setTimeout(finish, 5000);
-        const unwatch = watch(
+        unwatch = watch(
           () => [api.store.state.isReady, api.store.state.error] as const,
           ([ready, err]) => {
             if (ready || err) finish();
           },
           { immediate: true },
         );
-        void api.play(u);
+        if (done) unwatch();
+        void api.play(u, resolveProtocol(u));
       });
     },
+
     screenshot: (opts) => {
       const video = api.video;
       if (!video || !video.videoWidth) return undefined;
@@ -368,24 +381,27 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApiFull {
       if (!url) return;
       await new Promise<void>((resolve) => {
         let done = false;
+        let unwatch: (() => void) | null = null;
         const finish = () => {
           if (done) return;
           done = true;
           clearTimeout(timer);
-          unwatch();
+          unwatch?.();
           resolve();
         };
         const timer = setTimeout(finish, 5000);
-        const unwatch = watch(
+        unwatch = watch(
           () => [api.store.state.isReady, api.store.state.error] as const,
           ([ready, err]) => {
             if (ready || err) finish();
           },
           { immediate: true },
         );
-        void api.play(url);
+        if (done) unwatch();
+        void api.play(url, resolveProtocol(url));
       });
     },
+
     clear: async () => {
       api.destroyPlayer();
       stopStats();
@@ -394,7 +410,7 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApiFull {
       error.value = null;
       const url = lastUrl || api.store.state.url;
       if (!url) return;
-      void api.play(url);
+      void api.play(url, resolveProtocol(url));
     },
   };
 }

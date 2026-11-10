@@ -1,6 +1,6 @@
-/**
- * 根据 URL 猜测流协议类型
- */
+import { detectProtocol as detectPureProtocol } from '@vben/player-types';
+
+/** 根据 URL 猜测流协议类型 */
 export type StreamProtocol =
   | 'hls'
   | 'http-flv'
@@ -18,6 +18,65 @@ export interface ProtocolInfo {
   description: string;
 }
 
+/** UI 层协议文案映射 */
+const PROTOCOL_LABELS: Record<
+  StreamProtocol,
+  Omit<ProtocolInfo, 'protocol'>
+> = {
+  whep: {
+    label: 'WHEP',
+    color: 'blue',
+    description: '标准 WebRTC 协议，需服务器支持 WHIP/WHEP',
+  },
+  webrtc: {
+    label: 'SRS RTC',
+    color: 'green',
+    description: '超低延迟 WebRTC，需 SRS 服务器支持',
+  },
+  'ws-flv': {
+    label: 'WebSocket-FLV',
+    color: 'green',
+    description: 'WebSocket 长连接，低延迟，推荐',
+  },
+  'wss-flv': {
+    label: 'WSS-FLV',
+    color: 'green',
+    description: '加密 WebSocket 长连接，低延迟，推荐',
+  },
+  hls: {
+    label: 'HLS',
+    color: 'blue',
+    description: '基于 HTTP/HTTPS 的 HLS，兼容性好，延迟较高',
+  },
+  'https-flv': {
+    label: 'HTTPS-FLV',
+    color: 'green',
+    description: '基于 HTTPS 的 FLV，安全，推荐',
+  },
+  'http-flv': {
+    label: 'HTTP-FLV',
+    color: 'orange',
+    description: '基于 HTTP 的 FLV，可能被浏览器拦截（混合内容）',
+  },
+  unknown: {
+    label: '未知',
+    color: 'default',
+    description: '无法识别协议，请确认地址',
+  },
+};
+
+/** UI 层：带文案的协议识别（包装 player-types 纯函数） */
+export function detectProtocol(url: string): ProtocolInfo {
+  const protocol = detectPureProtocol(url);
+  return {
+    protocol,
+    ...(PROTOCOL_LABELS[protocol] ?? PROTOCOL_LABELS.unknown),
+  };
+}
+
+/** 重导出 player-types 的 detectOssrsProtocol（纯逻辑，UI 无需包装） */
+export { detectOssrsProtocol } from '@vben/player-types';
+
 export function createDebounce<T extends (...args: any[]) => void>(
   fn: T,
   delay: number,
@@ -26,85 +85,6 @@ export function createDebounce<T extends (...args: any[]) => void>(
   return (...args: Parameters<T>) => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => fn(...args), delay);
-  };
-}
-
-export function detectProtocol(url: string): ProtocolInfo {
-  const lower = url.trim().toLowerCase();
-
-  // 识别 WHEP
-  if (lower.includes('/whep/') || lower.includes('/whip-play/')) {
-    return {
-      protocol: 'whep',
-      label: 'WHEP',
-      color: 'blue',
-      description: '标准 WebRTC 协议，需服务器支持 WHIP/WHEP',
-    };
-  }
-
-  // 识别 SRS RTC (支持 webrtc:// 和 rtc://)
-  if (lower.startsWith('webrtc://') || lower.startsWith('rtc://')) {
-    return {
-      protocol: 'webrtc',
-      label: 'SRS RTC',
-      color: 'green',
-      description: '超低延迟 WebRTC，需 SRS 服务器支持',
-    };
-  }
-
-  if (lower.startsWith('ws://')) {
-    return {
-      protocol: 'ws-flv',
-      label: 'WebSocket-FLV',
-      color: 'green',
-      description: 'WebSocket 长连接，低延迟，推荐',
-    };
-  }
-  if (lower.startsWith('wss://')) {
-    return {
-      protocol: 'wss-flv',
-      label: 'WSS-FLV',
-      color: 'green',
-      description: '加密 WebSocket 长连接，低延迟，推荐',
-    };
-  }
-  if (lower.startsWith('https://') && lower.includes('.m3u8')) {
-    return {
-      protocol: 'hls',
-      label: 'HLS (HTTPS)',
-      color: 'blue',
-      description: '基于 HTTPS 的 HLS，兼容性好，延迟较高',
-    };
-  }
-  if (lower.startsWith('http://') && lower.includes('.m3u8')) {
-    return {
-      protocol: 'hls',
-      label: 'HLS (HTTP)',
-      color: 'orange',
-      description: '基于 HTTP 的 HLS，可能被浏览器拦截（混合内容）',
-    };
-  }
-  if (lower.startsWith('https://') && lower.includes('.flv')) {
-    return {
-      protocol: 'https-flv',
-      label: 'HTTPS-FLV',
-      color: 'green',
-      description: '基于 HTTPS 的 FLV，安全，推荐',
-    };
-  }
-  if (lower.startsWith('http://') && lower.includes('.flv')) {
-    return {
-      protocol: 'http-flv',
-      label: 'HTTP-FLV',
-      color: 'orange',
-      description: '基于 HTTP 的 FLV，可能被浏览器拦截（混合内容）',
-    };
-  }
-  return {
-    protocol: 'unknown',
-    label: '未知',
-    color: 'default',
-    description: '无法识别协议，请确认地址',
   };
 }
 
@@ -123,7 +103,7 @@ export interface ProbeResult {
 export async function probeUrl(url: string): Promise<ProbeResult> {
   const protocol = detectProtocol(url).protocol;
 
-  // 👇 核心修复：WebRTC 和 WHEP 协议不能使用 GET 探测（不支持 fetch），直接返回可访问
+  // WebRTC 和 WHEP 协议不能使用 GET 探测（不支持 fetch），直接返回可访问
   if (
     protocol === 'webrtc' ||
     protocol === 'whep' ||
@@ -176,44 +156,4 @@ export async function probeUrl(url: string): Promise<ProbeResult> {
   } finally {
     clearTimeout(timer);
   }
-}
-
-/**
- * 专门用于探测 Oryx / SRS 支持的协议类型
- */
-export function detectOssrsProtocol(
-  url: string,
-): 'flv' | 'hls' | 'rtc' | 'unknown' | 'whep' | 'ws-flv' | 'wss-flv' {
-  if (!url) return 'unknown';
-  const lower = url.toLowerCase();
-
-  // 1. 命中 WHEP 特征 (Oryx 标准 WebRTC 网关)
-  if (lower.includes('/whep/') || lower.includes('/whip-play/')) {
-    return 'whep';
-  }
-
-  // 2. 命中 SRS 原生 RTC 特征
-  if (lower.startsWith('webrtc://') || lower.startsWith('rtc://')) {
-    return 'rtc';
-  }
-
-  // 3. 识别 WebSocket-FLV
-  if (lower.startsWith('ws://')) {
-    return 'ws-flv';
-  }
-  if (lower.startsWith('wss://')) {
-    return 'wss-flv';
-  }
-
-  // 4. 兼容 HLS (m3u8)
-  if (lower.includes('.m3u8')) {
-    return 'hls';
-  }
-
-  // 5. 兼容 HTTP-FLV
-  if (lower.includes('.flv')) {
-    return 'flv';
-  }
-
-  return 'unknown';
 }
