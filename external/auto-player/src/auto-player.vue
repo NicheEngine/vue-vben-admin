@@ -28,12 +28,12 @@ const props = withDefaults(defineProps<AutoPlayerProps>(), {
   autoplay: true,
   muted: true,
   preferEngine: 'none',
+  objectFit: 'contain',
 });
 
 const env = reactive({ hasJessibuca: false, hasEasyPlayer: false });
 const isEnvReady = ref(false);
 
-// 计算当前应该用哪个引擎
 const activeEngine = computed(() => {
   if (!isEnvReady.value) return 'none';
   return detectEngine(props.url, {
@@ -43,23 +43,19 @@ const activeEngine = computed(() => {
   });
 });
 
-// 使用 shallowRef 挂载当前活跃的底层实例和 Component
 const activeComponent = shallowRef<any>(null);
 const activeApiInstance = shallowRef<any>(null);
 const activeAdapter = shallowRef<IPlayerApi | null>(null);
 
-// 状态机挂载：根据引擎变化，动态创建对应的实例
 watch(
   activeEngine,
   (engine) => {
-    // 1. 统一清理旧实例，依赖 Vue 的 unmount 机制去销毁底层
     activeComponent.value = null;
     activeApiInstance.value = null;
     activeAdapter.value = null;
 
     if (engine === 'none') return;
 
-    // 2. 按需初始化引擎
     if (engine === 'ossrs') {
       const [Comp, api] = useOssrsPlayer(props.ossrsOptions);
       activeComponent.value = Comp;
@@ -85,15 +81,12 @@ watch(
   { immediate: true },
 );
 
-// 1. 只监听 URL 和 引擎的变化，触发换流
 watch(
   [() => props.url, activeEngine],
   ([url, engine]) => {
     if (!activeAdapter.value || !url || engine === 'none') return;
-
     activeAdapter.value.setMuted(props.muted);
     activeAdapter.value.setUrl(url);
-
     if (props.autoplay) {
       setTimeout(() => activeAdapter.value?.play(), 100);
     }
@@ -101,28 +94,22 @@ watch(
   { immediate: true },
 );
 
-// 2. 单独监听静音
 watch(
   () => props.muted,
-  (muted) => {
-    activeAdapter.value?.setMuted?.(muted);
-  },
+  (muted) => activeAdapter.value?.setMuted?.(muted),
 );
 
-// 3. 单独监听自动播放
 watch(
   () => props.autoplay,
   (autoplay) => {
-    if (!autoplay) {
-      activeAdapter.value?.pause?.();
-    } else if (activeAdapter.value && !activeAdapter.value.isPlaying.value) {
+    if (!autoplay) activeAdapter.value?.pause?.();
+    else if (activeAdapter.value && !activeAdapter.value.isPlaying.value) {
       activeAdapter.value?.play?.();
     }
   },
 );
 
-// ================= 核心代理层 =================
-// ✅ 修复：直接暴露底层的 Ref，不再包装 computed，消除重复定义
+// ✅ 代理层直接暴露 Ref，不用 computed 包裹，避免类型冲突
 const proxyApi: AutoPlayerApi = {
   getActiveEngine: () => activeEngine.value,
   getRawInstance: () => activeApiInstance.value,
@@ -186,7 +173,6 @@ const proxyApi: AutoPlayerApi = {
     );
   },
 
-  // 代理所有操作
   play: async () => await activeAdapter.value?.play?.(),
   pause: async () => await activeAdapter.value?.pause?.(),
   toggle: async () => await activeAdapter.value?.toggle?.(),
@@ -237,8 +223,6 @@ onBeforeUnmount(() => {
     >
       {{ !props.url ? '请输入流媒体地址' : '当前环境无可用播放器' }}
     </div>
-
-    <!-- 动态渲染底层播放器组件 -->
     <div v-else class="absolute inset-0">
       <component
         :is="activeComponent"
@@ -249,6 +233,7 @@ onBeforeUnmount(() => {
           'player-api': activeApiInstance,
           autoplay: props.autoplay,
           muted: props.muted,
+          'object-fit': props.objectFit,
           class: 'w-full h-full',
         }"
       />

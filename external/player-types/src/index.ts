@@ -26,7 +26,12 @@ export interface PlayerCapabilities {
   seek: boolean;
   /** 是否支持全屏（requestFullscreen / exitFullscreen） */
   fullscreen: boolean;
-  /** 是否支持画中画（预留，当前四套均为 false） */
+  /**
+   * 是否支持画中画。
+   * 依赖 `getVideoElement()` 返回真实 `<video>`：
+   * - easy / live / ossrs：true
+   * - jessibuca（canvas 渲染）：false
+   */
   pip?: boolean;
   /** 是否支持离屏继续播放（仅 EasyPlayer 实现） */
   keepPlayingOffscreen?: boolean;
@@ -78,7 +83,12 @@ export interface ScreenshotOptions {
   filename?: string;
   /** 图片格式，默认 `'png'` */
   format?: 'jpeg' | 'png' | 'webp';
-  /** 返回类型，默认 `'base64'` */
+  /**
+   * 返回类型，默认 `'base64'`。
+   *
+   * 注意：当前仅 jessibuca 完整支持三种类型；
+   * easy / live / ossrs 忽略此字段，恒返回 base64 dataURL。
+   */
   type?: 'base64' | 'blob' | 'download';
 }
 
@@ -150,7 +160,12 @@ export interface IPlayerApi {
 
   // ===== 基础控制 =====
   setControlBarVisible?: (visible: boolean) => void;
-  /** 开始播放 */
+  /**
+   * 开始播放。
+   *
+   * 注意：`resolve` 仅表示"播放指令已下发"，**不代表已进入播放/就绪**。
+   * 判断是否真正开始请监听 `isPlaying` / `isReady`。
+   */
   play: () => Promise<void>;
   /** 暂停播放 */
   pause: () => Promise<void>;
@@ -198,7 +213,12 @@ export interface IPlayerApi {
   screenshot?: (opts?: ScreenshotOptions) => ScreenshotResult;
   /** 设置缩放模式，`capabilities.scaleMode` 为 `true` 时应实现 */
   setScaleMode?: (mode: 0 | 1 | 2) => void;
-  /** 开始录制，`capabilities.record` 为 `true` 时应实现 */
+  /**
+   * 开始录制，`capabilities.record` 为 `true` 时应实现。
+   *
+   * 注意：`name`/`type` 为建议值，当前仅 jessibuca 使用；
+   * 其余 adapter 忽略参数，使用内部默认命名。
+   */
   startRecord?: (name?: string, type?: string) => void;
   /** 停止录制并保存 */
   stopRecordAndSave?: () => void;
@@ -218,6 +238,21 @@ export interface IPlayerApi {
   getVideoElement?: () => HTMLVideoElement | null;
   /** 切换画中画模式，如果 capabilities.pip 为 true 则必须实现 */
   togglePiP?: () => Promise<void>;
+}
+
+/**
+ * 播放器扩展操作（派生语义，可用最小契约组合实现）。
+ *
+ * 非所有 adapter 必须实现；auto-player 等上层按需使用。
+ * 未实现的 adapter 调用方应 fallback 到 setUrl/play/pause 组合。
+ */
+export interface IPlayerApiExt {
+  /** 用当前 url 重新加载（不换 url），类似刷新 */
+  reload?: () => Promise<void>;
+  /** 停止播放并清空画面（占位），保留 url 以便恢复 */
+  clear?: () => Promise<void>;
+  /** 同 reload，但先清 error，语义上用于错误后重试 */
+  retry?: () => Promise<void>;
 }
 
 // ============================================================

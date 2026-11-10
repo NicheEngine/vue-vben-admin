@@ -311,6 +311,29 @@ export class OssrsPlayerApi {
                 })
                 .catch((error) => {
                   console.error('[SrsPlayer] 自动播放失败:', error);
+                  // autoplay 被拦截且未静音 → 静音重试一次
+                  if (!video.muted) {
+                    video.muted = true;
+                    this.store.setState((prev) => ({ ...prev, muted: true }));
+                    video
+                      .play()
+                      .then(() => {
+                        this.clearLoadTimeout();
+                        if (token === this.playToken) {
+                          this.store.setState((prev) => ({
+                            ...prev,
+                            isLoading: false,
+                            isReady: true,
+                            isPlaying: true,
+                          }));
+                          this.dispatch('onReady');
+                          this.dispatch('onLoadEnd');
+                        }
+                      })
+                      .catch((error_) => {
+                        console.error('[SrsPlayer] 静音重试仍失败:', error_);
+                      });
+                  }
                 });
             }
           };

@@ -23,7 +23,7 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
   const isRecording = ref(false);
   const recordingDuration = ref(0);
   const scaleMode = ref<0 | 1 | 2>(1);
-  const stats = ref<PlayerStats>({ buf: 0, fps: 0, vbps: 0 });
+  const stats = ref<PlayerStats>({ buf: 0, fps: 0, abps: 0, vbps: 0, ts: 0 });
 
   let mediaRecorder: MediaRecorder | null = null;
   let recordTimer: null | ReturnType<typeof setInterval> = null;
@@ -298,6 +298,7 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
       seek: false,
       fullscreen: true,
       pip: true,
+      keepPlayingOffscreen: true,
     },
 
     togglePiP: async () => {
@@ -336,18 +337,26 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
     setUrlAsync: async (u) => {
       error.value = null;
       lastErrorTime = 0;
+      if (!u) {
+        api.setUrl(u);
+        return;
+      }
       return new Promise<void>((resolve) => {
-        const timer = setTimeout(() => resolve(), 5000); // 5秒超时兜底
-        // 监听 store 中的 isReady
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          unwatch();
+          resolve();
+        };
+        const timer = setTimeout(finish, 5000);
         const unwatch = watch(
-          () => api.store.state.isReady,
-          (ready) => {
-            if (ready) {
-              clearTimeout(timer);
-              unwatch();
-              resolve();
-            }
+          () => [api.store.state.isReady, api.store.state.error] as const,
+          ([ready, err]) => {
+            if (ready || err) finish();
           },
+          { immediate: true },
         );
         api.setUrl(u);
       });
@@ -445,6 +454,52 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
     },
     exitFullscreen: async () => {
       if (document.fullscreenElement) await document.exitFullscreen();
+    },
+    setLoading: (loading: boolean) => {
+      isLoading.value = loading;
+    },
+    resize: () => {
+      // easy 通过 container 的 ResizeObserver 自动响应，这里主动触发一次 fit
+      api.setScaleMode(api.store.state.scaleMode ?? 1);
+    },
+    reload: async () => {
+      error.value = null;
+      lastErrorTime = 0;
+      const url = api.store.state.url;
+      if (!url) return;
+      await (async () => {
+        return new Promise<void>((resolve) => {
+          let done = false;
+          const finish = () => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            unwatch();
+            resolve();
+          };
+          const timer = setTimeout(finish, 5000);
+          const unwatch = watch(
+            () => [api.store.state.isReady, api.store.state.error] as const,
+            ([ready, err]) => {
+              if (ready || err) finish();
+            },
+            { immediate: true },
+          );
+          // easy 底层 replay：load + 按 playerMuted 恢复静音 + play
+          (api as any).replay?.();
+          if (!(api as any).replay) api.setUrl(url);
+        });
+      })();
+    },
+    clear: () => {
+      api.pause();
+    },
+    retry: async () => {
+      error.value = null;
+      lastErrorTime = 0;
+      const url = api.store.state.url;
+      if (!url) return;
+      api.setUrl(url);
     },
   };
 }

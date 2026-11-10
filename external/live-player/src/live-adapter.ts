@@ -11,7 +11,7 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
   const isReady = ref(api.store.state.isReady ?? false);
   const error = ref<null | string>(api.store.state.error ?? null);
   const volume = ref(api.store.state.volume ?? 1);
-  const isMuted = ref(api.store.state.muted ?? false);
+  const isMuted = ref(api.store.state.muted ?? true);
   const currentTime = ref(api.store.state.currentTime ?? 0);
   const videoWidth = ref(api.store.state.videoWidth ?? 0);
   const videoHeight = ref(api.store.state.videoHeight ?? 0);
@@ -82,6 +82,7 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
       seek: false,
       fullscreen: true,
       pip: true,
+      keepPlayingOffscreen: false,
     },
 
     togglePiP: async () => {
@@ -115,17 +116,28 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
       api.setUrl(u);
     },
     setUrlAsync: async (u) => {
-      return new Promise((resolve) => {
-        const timer = setTimeout(() => resolve(), 5000);
+      error.value = null;
+      lastErrorTime = 0;
+      if (!u) {
+        api.setUrl(u);
+        return;
+      }
+      return new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          unwatch();
+          resolve();
+        };
+        const timer = setTimeout(finish, 5000);
         const unwatch = watch(
-          () => api.store.state.isReady,
-          (ready) => {
-            if (ready) {
-              clearTimeout(timer);
-              unwatch();
-              resolve();
-            }
+          () => [api.store.state.isReady, api.store.state.error] as const,
+          ([ready, err]) => {
+            if (ready || err) finish();
           },
+          { immediate: true },
         );
         api.setUrl(u);
       });
@@ -218,6 +230,56 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
     },
     exitFullscreen: async () => {
       if (document.fullscreenElement) await document.exitFullscreen();
+    },
+    setLoading: (loading: boolean) => {
+      isLoading.value = loading;
+    },
+    resize: () => {
+      // 原生 video 自适应容器，无需额外操作
+    },
+    reload: async () => {
+      error.value = null;
+      lastErrorTime = 0;
+      const url = api.store.state.url;
+      if (!url) return;
+      return new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          unwatch();
+          resolve();
+        };
+        const timer = setTimeout(finish, 5000);
+        const unwatch = watch(
+          () => [api.store.state.isReady, api.store.state.error] as const,
+          ([ready, err]) => {
+            if (ready || err) finish();
+          },
+          { immediate: true },
+        );
+        // live 的 setUrl 会触发组件 watch 重建引擎
+        api.setUrl(url);
+      });
+    },
+    clear: () => {
+      api.pause();
+      // 清空 src，释放 MSE
+      const video = api.video;
+      if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      }
+    },
+    retry: async () => {
+      error.value = null;
+      lastErrorTime = 0;
+      const url = api.store.state.url;
+      if (!url) return;
+      api.setError?.(null);
+      api.setUrl(url);
     },
   };
 }

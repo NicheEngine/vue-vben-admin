@@ -46,7 +46,7 @@ function createDefaultState(): JessibucaStoreState {
     isReady: false,
     error: null,
     volume: 1,
-    muted: false,
+    muted: true,
     videoWidth: 0,
     videoHeight: 0,
     currentTime: 0,
@@ -55,7 +55,7 @@ function createDefaultState(): JessibucaStoreState {
     recordingDuration: 0,
     config: {
       autoPlay: true,
-      isMute: false,
+      isMute: true,
       volume: 1,
       debug: false,
       decoder: '/decoder.js',
@@ -266,6 +266,20 @@ export class JessibucaPlayerApi {
     try {
       await this.instance.play(url);
     } catch (error: any) {
+      console.warn('[JessibucaPlayerApi] Play failed:', error);
+      // autoplay 被拦截且未静音 → 静音重试一次
+      if (!this.store.state.muted && this.instance) {
+        this.mute();
+        try {
+          await this.instance.play(url);
+          return;
+        } catch (error_: any) {
+          console.warn(
+            '[JessibucaPlayerApi] Play retry(muted) failed:',
+            error_,
+          );
+        }
+      }
       this.setError(error?.message || '播放失败');
     }
   }

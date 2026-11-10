@@ -63,7 +63,7 @@ export class LivePlayerApi {
     const defaultState: LivePlayerStoreState = {
       url: '',
       autoplay: true,
-      muted: false,
+      muted: true,
       controls: true,
       type: undefined,
       hlsOptions: cloneDefaultHlsOptions(),
@@ -166,12 +166,21 @@ export class LivePlayerApi {
   }
 
   play() {
-    this.videoElement?.play().catch((error: unknown) => {
+    const video = this.videoElement;
+    if (!video) return;
+    video.play().catch((error: unknown) => {
       console.warn('[LivePlayerApi] Play failed:', error);
-      this.store.setState((prev) => ({
-        ...prev,
-        isPlaying: false,
-      }));
+      // autoplay 被拦截且当前未静音 → 静音重试一次
+      if (!video.muted) {
+        video.muted = true;
+        this.store.setState((prev) => ({ ...prev, muted: true }));
+        video.play().catch((error_: unknown) => {
+          console.warn('[LivePlayerApi] Play retry(muted) failed:', error_);
+          this.store.setState((prev) => ({ ...prev, isPlaying: false }));
+        });
+        return;
+      }
+      this.store.setState((prev) => ({ ...prev, isPlaying: false }));
     });
   }
 

@@ -191,10 +191,40 @@ export class EasyPlayerApi {
       isReady: false,
     }));
 
-    if (video && video.paused) {
-      video.play().catch((error) => console.warn('Play interrupted:', error));
+    if (!video) {
+      this.updatePlaying(true);
+      return;
     }
-    this.updatePlaying(true);
+
+    if (!video.paused) {
+      this.updatePlaying(true);
+      return;
+    }
+
+    video
+      .play()
+      .then(() => {
+        this.updatePlaying(true);
+      })
+      .catch((error) => {
+        console.warn('[EasyPlayerApi] Play failed:', error);
+        // autoplay 被拦截且未静音 → 静音重试一次
+        if (!video.muted) {
+          video.muted = true;
+          this.store.setState((prev) => ({ ...prev, muted: true }));
+          video
+            .play()
+            .then(() => {
+              this.updatePlaying(true);
+            })
+            .catch((error_) => {
+              console.warn('[EasyPlayerApi] Play retry(muted) failed:', error_);
+              this.updatePlaying(false);
+            });
+          return;
+        }
+        this.updatePlaying(false);
+      });
   }
 
   async replay() {
@@ -300,7 +330,20 @@ export class EasyPlayerApi {
     const prevMuted = this.store.state.muted;
     if (prevMuted === muted) return;
     this.store.setState((prev) => ({ ...prev, muted }));
-    this.instance?.switchAudio?.();
+
+    const video = this.containerEl?.querySelector(
+      'video',
+    ) as HTMLVideoElement | null;
+    if (video) video.muted = muted;
+
+    // switchAudio 语义（据 easy 源码）：
+    // - 非 H265：实际是 click .vjs-mute-control（toggle 静音按钮），
+    //   与 video.muted 重复且会引发 video.js UI 重建 → 不调用。
+    // - H265：真正切音轨（easyPlayer.switchAudio / flvPlayer.switchAudio），
+    //   静音切换需要它 → 调用。
+    if (this.store.state.isH265) {
+      this.instance?.switchAudio?.();
+    }
   }
 
   setScaleMode(mode: 0 | 1 | 2) {
@@ -325,8 +368,20 @@ export class EasyPlayerApi {
   setVolume(volume: number) {
     const vol = Math.min(1, Math.max(0, volume));
     this.store.setState((prev) => ({ ...prev, volume: vol }));
-    if (vol === 0 && !this.store.state.muted) this.setMuted(true);
-    else if (vol > 0 && this.store.state.muted) this.setMuted(false);
+
+    const video = this.containerEl?.querySelector(
+      'video',
+    ) as HTMLVideoElement | null;
+    if (video) video.volume = vol;
+
+    // 音量与静音联动：只同步 video.muted + store，不调 switchAudio
+    if (vol === 0 && !this.store.state.muted) {
+      if (video) video.muted = true;
+      this.store.setState((prev) => ({ ...prev, muted: true }));
+    } else if (vol > 0 && this.store.state.muted) {
+      if (video) video.muted = false;
+      this.store.setState((prev) => ({ ...prev, muted: false }));
+    }
   }
 
   async snapshot() {

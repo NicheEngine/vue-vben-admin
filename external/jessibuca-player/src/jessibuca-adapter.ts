@@ -162,6 +162,7 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
       seek: false,
       fullscreen: true,
       pip: false,
+      keepPlayingOffscreen: false,
     },
 
     play: () => api.play(),
@@ -178,17 +179,26 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
     setUrlAsync: async (u) => {
       error.value = null;
       lastErrorTime = 0;
-      return new Promise((resolve) => {
-        const timer = setTimeout(() => resolve(), 5000);
+      if (!u) {
+        api.setUrl(u);
+        return;
+      }
+      return new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          unwatch();
+          resolve();
+        };
+        const timer = setTimeout(finish, 5000);
         const unwatch = watch(
-          () => api.store.state.isReady,
-          (ready) => {
-            if (ready) {
-              clearTimeout(timer);
-              unwatch();
-              resolve();
-            }
+          () => [api.store.state.isReady, api.store.state.error] as const,
+          ([ready, err]) => {
+            if (ready || err) finish();
           },
+          { immediate: true },
         );
         api.setUrl(u);
         void api.play();
@@ -202,16 +212,12 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
 
     getVideoElement: () => null, // Jessibuca 用 canvas，无 video 元素
 
-    resize: () => api.resize(),
     screenshot: (opts) =>
       api.screenshot(opts?.filename, opts?.format, 1, opts?.type ?? 'base64'),
     setScaleMode: (m) => api.setScaleMode(m),
     startRecord: (n, t) => api.startRecord(n, t),
     stopRecordAndSave: () => api.stopRecordAndSave(),
 
-    setLoading: (loading: boolean) => {
-      isLoading.value = loading;
-    },
     requestFullscreen: async () => {
       const inst = api.getInstance() as any;
       if (inst && typeof inst.setFullscreen === 'function') {
@@ -223,6 +229,47 @@ export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
       if (inst && typeof inst.setFullscreen === 'function') {
         inst.setFullscreen(false);
       }
+    },
+    setLoading: (loading: boolean) => {
+      isLoading.value = loading;
+    },
+    resize: () => api.resize(),
+    reload: async () => {
+      error.value = null;
+      lastErrorTime = 0;
+      const url = api.store.state.url;
+      if (!url) return;
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          unwatch();
+          resolve();
+        };
+        const timer = setTimeout(finish, 5000);
+        const unwatch = watch(
+          () => [api.store.state.isReady, api.store.state.error] as const,
+          ([ready, err]) => {
+            if (ready || err) finish();
+          },
+          { immediate: true },
+        );
+        api.setUrl(url);
+        void api.play();
+      });
+    },
+    clear: async () => {
+      await (api as any).clearView?.();
+    },
+    retry: async () => {
+      error.value = null;
+      lastErrorTime = 0;
+      const url = api.store.state.url;
+      if (!url) return;
+      api.setUrl(url);
+      void api.play();
     },
   };
 }

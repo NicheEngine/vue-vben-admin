@@ -12,6 +12,7 @@ export interface AutoPlayerProps {
   autoplay?: boolean;
   muted?: boolean;
   class?: string;
+  objectFit?: 'contain' | 'cover' | 'fill';
 
   // 允许外部直接透传底层特定配置
   easyOptions?: Partial<EasyPlayerApiOptions>;

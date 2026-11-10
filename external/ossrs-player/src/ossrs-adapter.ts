@@ -1,7 +1,7 @@
 import type { OssrsPlayerApi } from '@vben/ossrs-player';
 import type { IPlayerApi, PlayerStats } from '@vben/player-types';
 
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 import { normalizeStats, safeUnsubscribe } from '@vben/player-types';
 
@@ -172,6 +172,7 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
       seek: false,
       fullscreen: true,
       pip: true,
+      keepPlayingOffscreen: false,
     },
 
     togglePiP: async () => {
@@ -214,13 +215,32 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
       }
     },
     setUrlAsync: async (u) => {
+      error.value = null;
       lastUrl = u;
       if (!u) {
         api.destroyPlayer();
         stopStats();
         return;
       }
-      await api.play(u);
+      return new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          unwatch();
+          resolve();
+        };
+        const timer = setTimeout(finish, 5000);
+        const unwatch = watch(
+          () => [api.store.state.isReady, api.store.state.error] as const,
+          ([ready, err]) => {
+            if (ready || err) finish();
+          },
+          { immediate: true },
+        );
+        void api.play(u);
+      });
     },
     screenshot: (opts) => {
       const video = api.video;
@@ -335,6 +355,46 @@ export function createOssrsAdapter(api: OssrsPlayerApi): IPlayerApi {
     },
     exitFullscreen: async () => {
       if (document.fullscreenElement) await document.exitFullscreen();
+    },
+    setLoading: (loading: boolean) => {
+      isLoading.value = loading;
+    },
+    resize: () => {
+      // 原生 video 自适应容器，无需额外操作
+    },
+    reload: async () => {
+      error.value = null;
+      const url = lastUrl || api.store.state.url;
+      if (!url) return;
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          unwatch();
+          resolve();
+        };
+        const timer = setTimeout(finish, 5000);
+        const unwatch = watch(
+          () => [api.store.state.isReady, api.store.state.error] as const,
+          ([ready, err]) => {
+            if (ready || err) finish();
+          },
+          { immediate: true },
+        );
+        void api.play(url);
+      });
+    },
+    clear: () => {
+      api.destroyPlayer();
+      stopStats();
+    },
+    retry: async () => {
+      error.value = null;
+      const url = lastUrl || api.store.state.url;
+      if (!url) return;
+      void api.play(url);
     },
   };
 }
