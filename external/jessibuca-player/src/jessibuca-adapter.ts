@@ -1,11 +1,13 @@
 import type { JessibucaPlayerApi } from '@vben/jessibuca-player';
-import type { IPlayerApi, PlayerStats } from '@vben/player-types';
+import type { IPlayerApiFull, PlayerStats } from '@vben/player-types';
 
 import { ref, watch } from 'vue';
 
 import { normalizeStats, safeUnsubscribe } from '@vben/player-types';
 
-export function createJessibucaAdapter(api: JessibucaPlayerApi): IPlayerApi {
+export function createJessibucaAdapter(
+  api: JessibucaPlayerApi,
+): IPlayerApiFull {
   const isPlaying = ref(api.store.state.isPlaying ?? false);
   const isLoading = ref(api.store.state.isLoading ?? false);
   const isReady = ref(api.store.state.isReady ?? false);

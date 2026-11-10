@@ -250,10 +250,18 @@ export interface IPlayerApiExt {
   /** 用当前 url 重新加载（不换 url），类似刷新 */
   reload?: () => Promise<void>;
   /** 停止播放并清空画面（占位），保留 url 以便恢复 */
-  clear?: () => Promise<void>;
+  clear?: () => Promise<void> | void;
   /** 同 reload，但先清 error，语义上用于错误后重试 */
   retry?: () => Promise<void>;
 }
+
+/**
+ * 完整播放器接口：主契约 + 扩展操作（reload/clear/retry 均必实现）。
+ *
+ * 四套 adapter 的返回类型使用此别名：
+ * 既满足 `IPlayerApi` 消费方，又暴露 ext 方法且不触发 excess property check。
+ */
+export type IPlayerApiFull = IPlayerApi & Required<IPlayerApiExt>;
 
 // ============================================================
 // 工具：统计归一化

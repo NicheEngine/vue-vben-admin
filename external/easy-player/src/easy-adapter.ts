@@ -1,5 +1,5 @@
 import type { EasyPlayerApi } from '@vben/easy-player';
-import type { IPlayerApi, PlayerStats } from '@vben/player-types';
+import type { IPlayerApiFull, PlayerStats } from '@vben/player-types';
 
 import type { EasyInternalPlayer } from './types';
 
@@ -7,7 +7,7 @@ import { ref, watch } from 'vue';
 
 import { normalizeStats, safeUnsubscribe } from '@vben/player-types';
 
-export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
+export function createEasyAdapter(api: EasyPlayerApi): IPlayerApiFull {
   // ================= 1. 本地响应式状态 =================
   const isPlaying = ref(api.store.state.isPlaying ?? false);
   const isLoading = ref(api.store.state.isLoading ?? false);
@@ -491,7 +491,7 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApi {
         });
       })();
     },
-    clear: () => {
+    clear: async () => {
       api.pause();
     },
     retry: async () => {

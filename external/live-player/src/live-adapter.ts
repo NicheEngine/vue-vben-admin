@@ -1,11 +1,11 @@
 import type { LivePlayerApi } from '@vben/live-player';
-import type { IPlayerApi, PlayerStats } from '@vben/player-types';
+import type { IPlayerApiFull, PlayerStats } from '@vben/player-types';
 
 import { ref, watch } from 'vue';
 
 import { normalizeStats, safeUnsubscribe } from '@vben/player-types';
 
-export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
+export function createLiveAdapter(api: LivePlayerApi): IPlayerApiFull {
   const isPlaying = ref(api.store.state.isPlaying ?? false);
   const isLoading = ref(api.store.state.isLoading ?? false);
   const isReady = ref(api.store.state.isReady ?? false);
@@ -263,7 +263,7 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApi {
         api.setUrl(url);
       });
     },
-    clear: () => {
+    clear: async () => {
       api.pause();
       // 清空 src，释放 MSE
       const video = api.video;
