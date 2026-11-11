@@ -34,58 +34,94 @@ const routes: RouteRecordRaw[] = [
       {
         name: 'AmapPluginExample',
         path: 'amap',
-        component: () => import('#/views/plugins/amap-plugin/index.vue'),
+        redirect: '/plugins/amap/amap-2d',
         meta: {
           icon: 'mdi:map-marker-radius-outline',
-          title: $t('plugins.amap'),
+          title: $t('plugins.amap.title'),
         },
+        children: [
+          {
+            name: 'Amap2dPluginExample',
+            path: 'amap-2d',
+            component: () =>
+              import('#/views/plugins/amap-plugin/amap-2d-plugin/index.vue'),
+            meta: {
+              icon: 'mdi:map-marker-radius-outline',
+              title: $t('plugins.amap.2d'),
+            },
+          },
+          {
+            name: 'Amap3dPluginExample',
+            path: 'amap-3d',
+            component: () =>
+              import('#/views/plugins/amap-plugin/amap-3d-plugin/index.vue'),
+            meta: {
+              icon: 'mdi:map-marker-radius-outline',
+              title: $t('plugins.amap.3d'),
+            },
+          },
+        ],
       },
       {
-        name: 'AutoPlayerPluginExample',
-        path: 'auto-player',
-        component: () => import('#/views/plugins/auto-player-plugin/index.vue'),
+        name: 'PlayerPluginExample',
+        path: 'player',
+        redirect: '/plugins/player/auto-player',
         meta: {
-          icon: 'mdi:auto-fix',
-          title: $t('plugins.autoPlayer'),
+          icon: 'mdi:play-box-multiple-outline',
+          title: $t('plugins.player.title'),
         },
-      },
-      {
-        name: 'LivePlayerPluginExample',
-        path: 'live-player',
-        component: () => import('#/views/plugins/live-player-plugin/index.vue'),
-        meta: {
-          icon: 'mdi:video-outline',
-          title: $t('plugins.livePlayer'),
-        },
-      },
-      {
-        name: 'EasyPlayerPluginExample',
-        path: 'easy-player',
-        component: () => import('#/views/plugins/easy-player-plugin/index.vue'),
-        meta: {
-          icon: 'mdi:play-circle-outline',
-          title: $t('plugins.easyPlayer'),
-        },
-      },
-      {
-        name: 'JessibucaPluginExample',
-        path: 'jessibuca-player',
-        component: () =>
-          import('#/views/plugins/jessibuca-player-plugin/index.vue'),
-        meta: {
-          icon: 'mdi:movie-play-outline',
-          title: $t('plugins.jessibucaPlayer'),
-        },
-      },
-      {
-        name: 'OssrsPlayerPluginExample',
-        path: 'ossrs-player',
-        component: () =>
-          import('#/views/plugins/ossrs-player-plugin/index.vue'),
-        meta: {
-          icon: 'mdi:play-network-outline',
-          title: $t('plugins.ossrsPlayer'),
-        },
+        children: [
+          {
+            name: 'AutoPlayerPluginExample',
+            path: 'auto-player',
+            component: () =>
+              import('#/views/plugins/player-plugin/auto-player-plugin/index.vue'),
+            meta: {
+              icon: 'mdi:auto-fix',
+              title: $t('plugins.player.auto'),
+            },
+          },
+          {
+            name: 'LivePlayerPluginExample',
+            path: 'live-player',
+            component: () =>
+              import('#/views/plugins/player-plugin/live-player-plugin/index.vue'),
+            meta: {
+              icon: 'mdi:video-outline',
+              title: $t('plugins.player.live'),
+            },
+          },
+          {
+            name: 'EasyPlayerPluginExample',
+            path: 'easy-player',
+            component: () =>
+              import('#/views/plugins/player-plugin/easy-player-plugin/index.vue'),
+            meta: {
+              icon: 'mdi:play-circle-outline',
+              title: $t('plugins.player.easy'),
+            },
+          },
+          {
+            name: 'JessibucaPluginExample',
+            path: 'jessibuca-player',
+            component: () =>
+              import('#/views/plugins/player-plugin/jessibuca-player-plugin/index.vue'),
+            meta: {
+              icon: 'mdi:movie-play-outline',
+              title: $t('plugins.player.jessibuca'),
+            },
+          },
+          {
+            name: 'OssrsPlayerPluginExample',
+            path: 'ossrs-player',
+            component: () =>
+              import('#/views/plugins/player-plugin/ossrs-player-plugin/index.vue'),
+            meta: {
+              icon: 'mdi:play-network-outline',
+              title: $t('plugins.player.ossrs'),
+            },
+          },
+        ],
       },
     ],
   },

@@ -1,27 +1,36 @@
+import type { DrawOptions, OverlayType } from './types';
+
 export class AmapPluginManager {
   private AMap: any = null;
+  private drawListeners = new Set<(overlay: any) => void>();
   private geocoder: any = null;
   private mapInstance: any = null;
   private mouseTool: any = null;
   private placeSearch: any = null;
+  private searchListeners = new Set<(overlay: any) => void>();
 
-  /** 销毁插件，解除所有引用 */
   public destroy() {
     this.mouseTool?.close(true);
     this.mouseTool = null;
     this.geocoder = null;
     this.placeSearch = null;
     this.mapInstance = null;
-    this.AMap = null; // 关键：解除对全局 AMap 的引用
+    this.AMap = null;
+    this.drawListeners.clear();
+    this.searchListeners.clear();
   }
 
-  /** 注入 AMap 全局对象和地图实例 */
   public init(AMap: any, mapInstance: any) {
     this.AMap = AMap;
     this.mapInstance = mapInstance;
   }
 
-  /** 逆地理编码（坐标转地址） */
+  /** 绘制完成事件订阅 */
+  public onDraw(cb: (overlay: any) => void): () => void {
+    this.drawListeners.add(cb);
+    return () => this.drawListeners.delete(cb);
+  }
+
   public async reverseGeocode(position: [number, number]): Promise<string> {
     this.ensureReady();
     if (!this.geocoder) {
@@ -41,61 +50,78 @@ export class AmapPluginManager {
     });
   }
 
-  /** POI 搜索 */
-  public async searchPOI(keyword: string): Promise<any[]> {
+  public async searchPOI(
+    keyword: string,
+    options?: { pageIndex?: number; pageSize?: number },
+  ): Promise<any[]> {
     this.ensureReady();
     if (!this.placeSearch) {
-      this.placeSearch = new this.AMap.PlaceSearch({
-        pageSize: 20,
-        pageIndex: 1,
-        citylimit: false,
-      });
+      // 不在构造时写死分页，交给每次 search 覆盖
+      this.placeSearch = new this.AMap.PlaceSearch({ citylimit: false });
     }
-    return new Promise((resolve) => {
-      this.placeSearch.search(keyword, (status: string, result: any) => {
-        if (status === 'complete' && result.poiList) {
-          resolve(result.poiList.pois);
-        } else {
-          resolve([]);
-        }
-      });
+    const pageIndex = options?.pageIndex ?? 1;
+    const pageSize = options?.pageSize ?? 20;
+    return new Promise((resolve, reject) => {
+      this.placeSearch.search(
+        keyword,
+        (status: string, result: any) => {
+          if (status === 'complete' && result.poiList) {
+            resolve(result.poiList.pois ?? []);
+          } else if (status === 'no_data') {
+            resolve([]);
+          } else {
+            reject(new Error(`POI 搜索失败：${status}`));
+          }
+        },
+        { pageIndex, pageSize },
+      );
     });
   }
 
-  /** 开启绘制模式 */
-  public startDraw(mode: 'circle' | 'marker' | 'polygon' | 'polyline') {
+  public startDraw(mode: OverlayType, options?: DrawOptions) {
     this.ensureReady();
     if (!this.mouseTool) {
       this.mouseTool = new this.AMap.MouseTool(this.mapInstance);
+      this.mouseTool.on('draw', (e: any) => {
+        // 🔥 绘制完成后广播给所有订阅者
+        this.drawListeners.forEach((fn) => fn(e.obj));
+      });
     }
-    this.mouseTool.close(false); // 先关闭旧的绘制状态
+    this.mouseTool.close(false);
+
+    const styleOptions = options
+      ? {
+          strokeColor: options.strokeColor,
+          strokeWeight: options.strokeWeight,
+          fillColor: options.fillColor,
+          fillOpacity: options.fillOpacity,
+        }
+      : undefined;
 
     switch (mode) {
       case 'circle': {
-        this.mouseTool.circle();
+        this.mouseTool.circle(styleOptions);
         break;
       }
       case 'marker': {
-        this.mouseTool.marker();
+        this.mouseTool.marker(styleOptions);
         break;
       }
       case 'polygon': {
-        this.mouseTool.polygon();
+        this.mouseTool.polygon(styleOptions);
         break;
       }
       case 'polyline': {
-        this.mouseTool.polyline();
+        this.mouseTool.polyline(styleOptions);
         break;
       }
     }
   }
 
-  /** 停止绘制模式 */
   public stopDraw() {
     this.mouseTool?.close(true);
   }
 
-  /** 内部校验，确保已正确初始化 */
   private ensureReady() {
     if (!this.AMap || !this.mapInstance) {
       throw new Error(

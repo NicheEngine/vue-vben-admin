@@ -1,15 +1,13 @@
 {
   "name": "@vben/amap",
   "version": "1.0.0",
-  "homepage": "https://github.com/nicheengine/temple-engine-webapp",
-  "bugs": "https://github.com/nicheengine/temple-engine-webapp/issues",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/nicheengine/temple-engine-webapp.git",
-    "directory": "external/amap-extend"
-  },
   "license": "MIT",
   "type": "module",
+  "files": [
+    "global.d.ts",
+    "src"
+  ],
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -20,9 +18,13 @@
       "default": "./global.d.ts"
     }
   },
+  "peerDependencies": {
+    "vue": "^3.4.0"
+  },
   "dependencies": {
-    "@amap/amap-jsapi-loader": "catalog:",
-    "@vben/utils": "workspace:*",
+    "@amap/amap-jsapi-loader": "catalog:"
+  },
+  "devDependencies": {
     "vue": "catalog:"
   }
 }

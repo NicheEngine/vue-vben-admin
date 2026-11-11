@@ -2,10 +2,17 @@
   "title": "外掛",
   "cesium": "Cesium 外掛",
   "tianditu": "天地圖 外掛",
-  "amap": "高德地圖 外掛",
-  "livePlayer": "LivePlayer 外掛",
-  "easyPlayer": "EasyPlayer 外掛",
-  "jessibucaPlayer": "JessibucaPlayer 外掛",
-  "ossrsPlayer": "OssrsPlayer 外掛",
-  "autoPlayer": "AutoPlayer 聯合外掛"
+  "amap": {
+    "title": "高德地圖 外掛",
+    "2d": "2D地圖",
+    "3d": "3D地圖"
+  },
+  "player": {
+    "title": "播放器 外掛",
+    "live": "LivePlayer",
+    "easy": "EasyPlayer",
+    "jessibuca": "JessibucaPlayer",
+    "ossrs": "OssrsPlayer",
+    "auto": "AutoPlayer"
+  }
 }

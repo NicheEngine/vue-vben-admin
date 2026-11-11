@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { Amap3dConfig, IAmap3dApi } from './core/types';
+import type { Amap3dConfig, AmapEventType, IAmap3dApi } from './core/types';
 
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
@@ -16,42 +16,63 @@ const props = withDefaults(
   },
 );
 
+const emit = defineEmits<{
+  click: [e: any];
+  moveend: [e: any];
+  zoomchange: [e: any];
+}>();
+
 const containerRef = ref<HTMLElement>();
 const ownsApi = !props.api;
 const api = props.api ?? createAmap3dAdapter();
 
 let mounted = false;
+const offHandlers: Array<() => void> = [];
 
-watch(
-  () => props.config,
-  async (cfg) => {
-    if (!mounted) return;
-    if (cfg.center) api.setCenter(cfg.center);
-    if (cfg.zoom !== undefined) api.setZoom(cfg.zoom);
-    if (cfg.pitch !== undefined) api.setPitch(cfg.pitch);
-    if (cfg.rotation !== undefined) api.setRotation(cfg.rotation);
-  },
-  { deep: true },
-);
+/** config → 命令 映射表 */
+const configHandlers: Record<string, (v: any) => void> = {
+  center: (v) => api.setCenter(v),
+  zoom: (v) => api.setZoom(v),
+  pitch: (v) => api.setPitch(v),
+  rotation: (v) => api.setRotation(v),
+  layers: (v) => api.setLayers(v),
+  features: (v) => api.setFeatures(v),
+};
 
 async function mountMap() {
   if (!containerRef.value) return;
   try {
     await api.init(containerRef.value, props.config);
     mounted = true;
+    // 事件透传
+    const evts: AmapEventType[] = ['click', 'moveend', 'zoomchange'];
+    for (const evt of evts) {
+      offHandlers.push(api.on(evt, (e) => emit(evt as any, e)));
+    }
   } catch (error) {
     console.error('[Amap3d] 地图初始化失败', error);
   }
 }
 
-onMounted(() => {
-  void mountMap();
-});
+watch(
+  () => props.config,
+  (cfg, prev) => {
+    if (!mounted || !prev) return;
+    for (const key of Object.keys(cfg ?? {})) {
+      if ((cfg as any)[key] !== (prev as any)[key]) {
+        configHandlers[key]?.((cfg as any)[key]);
+      }
+    }
+  },
+  { deep: true },
+);
+
+onMounted(() => void mountMap());
 
 onBeforeUnmount(async () => {
-  if (ownsApi) {
-    await api.destroy();
-  }
+  offHandlers.forEach((off) => off());
+  offHandlers.length = 0;
+  if (ownsApi) await api.destroy();
 });
 
 defineExpose({ api });

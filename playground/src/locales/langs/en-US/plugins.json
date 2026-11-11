@@ -2,10 +2,17 @@
   "title": "Plugins",
   "cesium": "Cesium Plugin",
   "tianditu": "Tianditu Plugin",
-  "amap": "Amap Plugin",
-  "livePlayer": "LivePlayer Plugin",
-  "easyPlayer": "EasyPlayer Plugin",
-  "jessibucaPlayer": "JessibucaPlayer Plugin",
-  "ossrsPlayer": "OssrsPlayer Plugin",
-  "autoPlayer": "AutoPlayer Union Plugin"
+  "amap": {
+    "title": "AMap Plugin",
+    "2d": "2D Map",
+    "3d": "3D Map"
+  },
+  "player": {
+    "title": "Player Plugin",
+    "live": "LivePlayer",
+    "easy": "EasyPlayer",
+    "jessibuca": "JessibucaPlayer",
+    "ossrs": "OssrsPlayer",
+    "auto": "AutoPlayer"
+  }
 }

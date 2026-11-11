@@ -2,10 +2,17 @@
   "title": "插件",
   "cesium": "Cesium 插件",
   "tianditu": "天地图 插件",
-  "amap": "高德地图 插件",
-  "livePlayer": "LivePlayer 插件",
-  "easyPlayer": "EasyPlayer 插件",
-  "jessibucaPlayer": "JessibucaPlayer 插件",
-  "ossrsPlayer": "OssrsPlayer 插件",
-  "autoPlayer": "AutoPlayer 联合插件"
+  "amap": {
+    "title": "高德地图 插件",
+    "2d": "2D地图",
+    "3d": "3D地图"
+  },
+  "player": {
+    "title": "播放器 插件",
+    "live": "LivePlayer",
+    "easy": "EasyPlayer",
+    "jessibuca": "JessibucaPlayer",
+    "ossrs": "OssrsPlayer",
+    "auto": "AutoPlayer"
+  }
 }
