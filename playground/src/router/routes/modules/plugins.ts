@@ -32,6 +32,15 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'AmapPluginExample',
+        path: 'amap',
+        component: () => import('#/views/plugins/amap-plugin/index.vue'),
+        meta: {
+          icon: 'mdi:map-marker-radius-outline',
+          title: $t('plugins.amap'),
+        },
+      },
+      {
         name: 'AutoPlayerPluginExample',
         path: 'auto-player',
         component: () => import('#/views/plugins/auto-player-plugin/index.vue'),

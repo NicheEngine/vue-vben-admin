@@ -1042,9 +1042,6 @@ importers:
       '@amap/amap-jsapi-loader':
         specifier: 'catalog:'
         version: 1.0.1
-      '@vben/types':
-        specifier: workspace:*
-        version: link:../../packages/types
       '@vben/utils':
         specifier: workspace:*
         version: link:../../packages/utils
@@ -2157,6 +2154,9 @@ importers:
       '@vben/access':
         specifier: workspace:*
         version: link:../packages/effects/access
+      '@vben/amap':
+        specifier: workspace:*
+        version: link:../external/amap-extend
       '@vben/auto-player':
         specifier: workspace:*
         version: link:../external/auto-player

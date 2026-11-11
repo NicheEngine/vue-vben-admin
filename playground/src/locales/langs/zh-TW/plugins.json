@@ -1,7 +1,8 @@
 {
   "title": "外掛",
   "cesium": "Cesium 外掛",
-  "tianditu": "天地圖外掛",
+  "tianditu": "天地圖 外掛",
+  "amap": "高德地圖 外掛",
   "livePlayer": "LivePlayer 外掛",
   "easyPlayer": "EasyPlayer 外掛",
   "jessibucaPlayer": "JessibucaPlayer 外掛",
