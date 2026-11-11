@@ -79,14 +79,16 @@ export function chooseEngine(
         ? (['easy'] as AutoPlayerType[])
         : (['jessibuca', 'easy'] as AutoPlayerType[]);
     const chain = candidates.filter((t) => ready[t]);
-    if (chain.length > 0) {
-      const type = firstOf(chain, 'easy');
-      return {
-        type,
-        reason: `H265 → ${ENGINE_LABELS[type]}`,
-        fallback: chain.slice(1),
-      };
-    }
+    // 即使都不可用，也强制返回候选首个，由 mountEngine 尝试；
+    // 避免落空后走通用 priority 误选不支持 H265 的 live/ossrs
+    const type = chain[0] ?? candidates[0] ?? 'easy';
+    return {
+      type,
+      reason: `H265 → ${ENGINE_LABELS[type]}${
+        chain.length === 0 ? '（资源未就绪，强制尝试）' : ''
+      }`,
+      fallback: chain.slice(1),
+    };
   }
 
   const priority = PRIORITY[protocol] ?? PRIORITY.unknown ?? [];

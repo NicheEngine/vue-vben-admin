@@ -24,6 +24,7 @@ type EngineFactory = {
     muted: boolean;
     autoplay: boolean;
     isH265: boolean;
+    options: AutoPlayerOptions;
   }) => Promise<{
     adapter: IPlayerApiFull;
     component: any;
@@ -34,12 +35,13 @@ type EngineFactory = {
 
 const factories: Record<AutoPlayerType, EngineFactory> = {
   easy: {
-    async create({ url, muted }) {
+    async create({ url, muted, autoplay, options }) {
       const { useEasyPlayer } = await import('@vben/easy-player');
       const [Component, api] = useEasyPlayer({
+        ...options.easyOptions,
         videoUrl: url,
         muted,
-        autoplay: true,
+        autoplay,
       });
       const adapter = createEasyAdapter(api);
       return {
@@ -54,11 +56,20 @@ const factories: Record<AutoPlayerType, EngineFactory> = {
     },
   },
   jessibuca: {
-    async create({ url, muted, isH265 }) {
+    async create({ url, muted, autoplay, isH265, options }) {
       const { useJessibucaPlayer } = await import('@vben/jessibuca-player');
       const [Component, api] = useJessibucaPlayer({
+        ...options.jessibucaOptions,
         initialUrl: url,
-        initialConfig: { isMute: muted, isH265 },
+        initialConfig: {
+          ...options.jessibucaOptions?.initialConfig,
+          isMute: muted,
+          isH265,
+          autoPlay: autoplay,
+          decoder:
+            options.jessibucaOptions?.initialConfig?.decoder ??
+            '/jessibuca/decoder.js',
+        },
       });
       const adapter = createJessibucaAdapter(api);
       return {
@@ -73,9 +84,13 @@ const factories: Record<AutoPlayerType, EngineFactory> = {
     },
   },
   live: {
-    async create({ muted }) {
+    async create({ muted, autoplay, options }) {
       const { useLivePlayer } = await import('@vben/live-player');
-      const [Component, api] = useLivePlayer({ muted, autoplay: true });
+      const [Component, api] = useLivePlayer({
+        ...options.liveOptions,
+        muted,
+        autoplay,
+      });
       const adapter = createLiveAdapter(api);
       return {
         adapter,
@@ -89,12 +104,18 @@ const factories: Record<AutoPlayerType, EngineFactory> = {
     },
   },
   ossrs: {
-    async create({ url, muted, autoplay }) {
+    async create({ url, muted, autoplay, options }) {
       const { useOssrsPlayer } = await import('@vben/ossrs-player');
       const protocol = detectOssrsProtocol(url) === 'whep' ? 'whep' : 'rtc';
       const [Component, api] = useOssrsPlayer({
+        ...options.ossrsOptions,
         initialUrl: url,
-        initialState: { muted, autoplay, url },
+        initialState: {
+          ...options.ossrsOptions?.initialState,
+          muted,
+          autoplay,
+          url,
+        },
         initialProtocol: protocol,
       });
       const adapter = createOssrsAdapter(api);
@@ -157,18 +178,29 @@ export class AutoPlayerApi {
     this.scaleMode.value = options.scaleMode ?? 1;
   }
 
-  async clear() {
+  async clear(): Promise<void> {
     if (!this.adapter) return;
-    const currentAdapter = this.adapter;
-
+    const adapter = this.adapter;
+    this.error.value = null;
     try {
-      await (currentAdapter.clear?.() ?? (await currentAdapter.pause()));
+      await (typeof adapter.clear === 'function'
+        ? adapter.clear()
+        : adapter.pause());
     } catch (error) {
-      console.warn('[AutoPlayer] clear ignored:', error);
+      console.warn('[AutoPlayer] clear failed, fallback to pause:', error);
+      try {
+        await adapter.pause();
+      } catch (error_) {
+        console.warn('[AutoPlayer] clear fallback pause failed:', error_);
+      }
     }
+    // clear 后同步状态：不播放，但保留 url 以便 play 恢复
+    this.isPlaying.value = false;
+    this.isLoading.value = false;
   }
 
   async destroy(): Promise<void> {
+    this.stopRecordIfNeeded();
     this.generation++;
     this.stopSync();
     this.engineChangeCbs.clear();
@@ -218,10 +250,10 @@ export class AutoPlayerApi {
     return this.adapter?.getVideoElement?.() ?? null;
   }
 
-  async init(url?: string): Promise<void> {
+  async init(url?: string): Promise<IPlayerApiFull | null> {
     const target = url ?? this.url;
     if (target) this.url = target;
-    if (!this.url) return;
+    if (!this.url) return null;
 
     const ready = checkEngineReadySync();
     const result = chooseEngine(
@@ -241,12 +273,15 @@ export class AutoPlayerApi {
       if (!ok) continue;
       try {
         await this.mountEngine(type);
-        return;
+        return this.adapter;
       } catch (error) {
         console.warn(`[AutoPlayer] mount ${type} failed`, error);
       }
     }
     this.error.value = '无可用播放器引擎';
+    this.isLoading.value = false;
+    this.isReady.value = false;
+    return null;
   }
 
   onEngineChange(cb: (t: AutoPlayerType) => void): () => void {
@@ -277,6 +312,8 @@ export class AutoPlayerApi {
   }
 
   async reset() {
+    await this.clear();
+    this.stopRecordIfNeeded();
     this.generation++; // 阻断旧的回调
     this.stopSync();
     if (this.destroyApi) {
@@ -368,12 +405,28 @@ export class AutoPlayerApi {
 
   async setUrlAsync(url: string) {
     this.url = url;
+
     if (!this.adapter) {
-      // 首次：初始化引擎。url 由组件挂载后通过 props 加载，不在此调 play。
       await this.init(url);
       return;
     }
-    await this.adapter.setUrlAsync?.(url);
+
+    const adapter: IPlayerApiFull = this.adapter;
+    if (adapter.setUrlAsync) {
+      try {
+        await adapter.setUrlAsync(url);
+      } catch (error) {
+        console.warn(
+          '[AutoPlayer] setUrlAsync failed, fallback to setUrl+play:',
+          error,
+        );
+        adapter.setUrl(url);
+        await adapter.play();
+      }
+      return;
+    }
+    adapter.setUrl(url);
+    await adapter.play();
   }
 
   setVolume(v: number) {
@@ -388,6 +441,10 @@ export class AutoPlayerApi {
     }
     if (!this.adapter.startRecord) {
       this.error.value = '当前播放器不支持录制';
+      return;
+    }
+    if (!this.isPlaying.value || !this.isReady.value) {
+      this.error.value = '请先播放视频后再开始录制';
       return;
     }
     try {
@@ -422,11 +479,22 @@ export class AutoPlayerApi {
 
   async switchType(type: AutoPlayerType): Promise<void> {
     if (type === this.engineTypeRef.value) return;
+
     if (!checkEngineReadySync()[type]) {
-      console.warn(`[AutoPlayer] engine ${type} not ready, switch ignored`);
-      return;
+      const ok = await waitEngineReady(type, 2000);
+      if (!ok) {
+        this.error.value = `引擎 ${type} 资源未就绪，无法切换`;
+        console.warn(`[AutoPlayer] engine ${type} not ready, switch ignored`);
+        return;
+      }
     }
-    await this.mountEngine(type);
+
+    try {
+      await this.mountEngine(type);
+    } catch (error) {
+      console.warn(`[AutoPlayer] switchType ${type} failed`, error);
+      this.error.value = `切换到引擎 ${type} 失败`;
+    }
   }
 
   async toggle() {
@@ -439,6 +507,8 @@ export class AutoPlayerApi {
 
   private async mountEngine(type: AutoPlayerType): Promise<void> {
     const gen = ++this.generation;
+    this.error.value = null;
+    this.isLoading.value = true;
     this.stopSync();
     if (this.destroyApi) {
       try {
@@ -459,6 +529,7 @@ export class AutoPlayerApi {
       muted: this.isMuted.value,
       autoplay: this.options.autoplay ?? true,
       isH265: this.isH265,
+      options: this.options,
     });
 
     if (gen !== this.generation) {
@@ -552,6 +623,16 @@ export class AutoPlayerApi {
       watch(adapter.stats, sync, { deep: true }),
     ];
     this.syncUnsub = () => stops.forEach((s) => s());
+  }
+
+  private stopRecordIfNeeded() {
+    if (this.isRecording.value && this.adapter?.stopRecordAndSave) {
+      try {
+        this.adapter.stopRecordAndSave();
+      } catch (error_) {
+        console.warn('[AutoPlayer] stopRecordIfNeeded failed:', error_);
+      }
+    }
   }
 
   private stopSync(): void {

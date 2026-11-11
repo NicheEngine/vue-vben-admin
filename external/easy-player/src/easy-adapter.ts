@@ -386,9 +386,15 @@ export function createEasyAdapter(api: EasyPlayerApi): IPlayerApiFull {
 
     startRecord: () => {
       const video = getVideo();
-      if (!video) return;
+      if (!video) {
+        error.value = '播放器未就绪，无法录制';
+        return;
+      }
+      if (!isPlaying.value || video.paused) {
+        error.value = '请先播放视频后再开始录制';
+        return;
+      }
       if (isRecording.value) return;
-
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth || 1280;
       canvas.height = video.videoHeight || 720;

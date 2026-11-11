@@ -332,7 +332,7 @@ onBeforeUnmount(() => {
         :is-cleared="isCleared"
       >
         <Player
-          v-if="!isCleared"
+          v-if="currentUrl && !isCleared"
           :key="playerKey"
           :url="currentUrl"
           :autoplay="config.autoplay"

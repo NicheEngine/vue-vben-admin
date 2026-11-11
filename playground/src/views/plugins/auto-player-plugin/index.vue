@@ -1,5 +1,7 @@
 <script lang="ts" setup>
-import { computed, onBeforeUnmount, ref } from 'vue';
+import type { AutoMultiScreenPlayer } from '@vben/auto-player';
+
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 
 import { createAutoMultiScreenPlayers, useAutoPlayer } from '@vben/auto-player';
 import { Page } from '@vben/common-ui';
@@ -26,13 +28,18 @@ const currentUrl = ref(DEFAULT_URL);
 const urlHistory = ref<string[]>([]);
 const showMultiScreen = ref(false);
 const isCleared = ref(false);
-// ✅ 新增：当前激活引擎（与 ProtocolDetect 双向）
+// 新增：当前激活引擎（与 ProtocolDetect 双向）
 const activeEngine = ref('');
 
 const [Player, api] = useAutoPlayer({
   muted: true,
   autoplay: true,
   initialUrl: '',
+  jessibucaOptions: {
+    initialConfig: {
+      decoder: '/jessibuca/decoder.js',
+    },
+  },
 });
 
 const player = api;
@@ -45,14 +52,35 @@ const engineCandidates = computed(() => {
   return api.getCandidates();
 });
 
-const multiPlayers = computed(() => {
-  if (!showMultiScreen.value || !currentUrl.value) return [];
+const multiPlayers = shallowRef<AutoMultiScreenPlayer[]>([]);
 
-  // 🔥 将当前选中的引擎传给工厂函数
-  return createAutoMultiScreenPlayers(
+function destroyMultiPlayers() {
+  multiPlayers.value.forEach((p) => {
+    void p.onDestroy();
+  });
+  multiPlayers.value = [];
+}
+
+function rebuildMultiPlayers() {
+  destroyMultiPlayers();
+  if (!showMultiScreen.value || !currentUrl.value) return;
+  multiPlayers.value = createAutoMultiScreenPlayers(
     currentUrl.value,
-    engineType.value as any, // 比如 'live'、'easy' 或 'jessibuca'
+    engineType.value ?? undefined,
   );
+}
+
+watch(
+  [showMultiScreen, currentUrl, engineType],
+  () => {
+    rebuildMultiPlayers();
+  },
+  { immediate: false },
+);
+
+onBeforeUnmount(() => {
+  destroyMultiPlayers();
+  void api.destroy();
 });
 
 function applyUrl(u?: string) {
@@ -64,18 +92,20 @@ function applyUrl(u?: string) {
   history.unshift(value);
   urlHistory.value = history.slice(0, 10);
   void api.setUrlAsync(value).then(() => {
-    // ✅ 同步实际选中引擎
+    // 同步实际选中引擎
     activeEngine.value = api.getEngineType() ?? '';
   });
 }
 
 function resetUrl() {
   inputUrl.value = DEFAULT_URL;
-  currentUrl.value = DEFAULT_URL;
   urlHistory.value = [];
   isCleared.value = false;
   activeEngine.value = '';
-  void api.reset();
+  void api.reset().then(() => {
+    // 2. 清空 currentUrl 触发 v-if 卸载
+    currentUrl.value = DEFAULT_URL;
+  });
 }
 
 // 新增：手动切换引擎
@@ -210,7 +240,7 @@ onBeforeUnmount(() => {
         :recording-duration="player.recordingDuration.value"
         :start-record="(n, t) => api.startRecord(n, t)"
         :stop-record-and-save="() => api.stopRecordAndSave()"
-        :can-record="true"
+        :can-record="player.isPlaying.value"
       />
     </template>
 

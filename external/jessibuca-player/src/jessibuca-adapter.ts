@@ -221,7 +221,14 @@ export function createJessibucaAdapter(
     screenshot: (opts) =>
       api.screenshot(opts?.filename, opts?.format, 1, opts?.type ?? 'base64'),
     setScaleMode: (m) => api.setScaleMode(m),
-    startRecord: (n, t) => api.startRecord(n, t),
+    startRecord: (n, t) => {
+      try {
+        api.startRecord(n, t);
+      } catch (error: any) {
+        console.warn('[JessAdapter] startRecord failed:', error);
+        error.value = error?.message || '开始录制失败';
+      }
+    },
     stopRecordAndSave: () => api.stopRecordAndSave(),
 
     requestFullscreen: async () => {

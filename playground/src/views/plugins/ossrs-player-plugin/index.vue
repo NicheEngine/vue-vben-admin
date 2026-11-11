@@ -143,7 +143,7 @@ function resetUrl() {
   currentUrl.value = DEFAULT_URL;
   urlHistory.value = [];
   isCleared.value = false;
-  api.destroyPlayer();
+  api.destroy();
 }
 
 function handleToggle() {
@@ -307,6 +307,7 @@ onBeforeUnmount(() => {
       :is-cleared="isCleared"
     >
       <Player
+        v-if="currentUrl && !isCleared"
         :api="api"
         :url="currentUrl"
         :protocol="config.protocol"

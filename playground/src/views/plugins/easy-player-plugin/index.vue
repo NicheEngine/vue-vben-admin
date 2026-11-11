@@ -145,7 +145,7 @@ function resetUrl() {
   currentUrl.value = DEFAULT_URL;
   urlHistory.value = [];
   isCleared.value = false;
-  api.destroyPlayer();
+  api.destroy();
 }
 
 function handleToggle() {
@@ -283,7 +283,7 @@ onBeforeUnmount(() => {
         :is-cleared="isCleared"
       >
         <Player
-          v-if="currentUrl"
+          v-if="currentUrl && !isCleared"
           :show-control-bar="showControlBar"
           :player-api="api"
           :video-url="currentUrl"

@@ -90,7 +90,6 @@ const mappedProps = computed(() => {
     case 'jessibuca': {
       return {
         ...base,
-        key: `jess-${currentScaleMode}`,
         api: raw,
         url: props.url,
         config: {

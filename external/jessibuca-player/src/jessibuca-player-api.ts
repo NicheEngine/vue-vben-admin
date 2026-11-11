@@ -1,10 +1,10 @@
 import type { Store } from '@vben-core/shared/store';
 
 import type {
-  JessibucaApiOptions,
   JessibucaCallbacks,
   JessibucaConfig,
   JessibucaInstance,
+  JessibucaPlayerApiOptions,
   JessibucaStoreState,
 } from './types';
 
@@ -30,6 +30,7 @@ const STRUCTURAL_CONFIG_KEYS = new Set<keyof JessibucaConfig>([
   'decoder',
   'enableRecording',
   'forceNoOffscreen',
+  'isH265',
   'openWebglAlignment',
   'recordType',
   'useMSE',
@@ -58,7 +59,7 @@ function createDefaultState(): JessibucaStoreState {
       isMute: true,
       volume: 1,
       debug: false,
-      decoder: '/decoder.js',
+      decoder: '/jessibuca/decoder.js',
       timeout: 10,
       loadingTimeout: 10,
       heartTimeout: 10,
@@ -76,6 +77,7 @@ function createDefaultState(): JessibucaStoreState {
       heartTimeoutReplay: false,
       loadingTimeoutReplayTimes: 0,
       heartTimeoutReplayTimes: 0,
+      isH265: false,
     },
   };
 }
@@ -96,7 +98,7 @@ export class JessibucaPlayerApi {
   /** 用户层回调（setCallbacks 更新） */
   private userCallbacks: JessibucaCallbacks = {};
 
-  constructor(options: JessibucaApiOptions = {}) {
+  constructor(options: JessibucaPlayerApiOptions = {}) {
     const {
       onPlay,
       onPause,
@@ -404,7 +406,11 @@ export class JessibucaPlayerApi {
 
     // ---- 结构性配置 ----
     for (const key of Object.keys(incoming) as (keyof JessibucaConfig)[]) {
-      if (STRUCTURAL_CONFIG_KEYS.has(key) && incoming[key] !== prevCfg[key]) {
+      if (
+        STRUCTURAL_CONFIG_KEYS.has(key) &&
+        incoming[key] !== undefined &&
+        incoming[key] !== prevCfg[key]
+      ) {
         this.rebuildFlag = true;
         break;
       }

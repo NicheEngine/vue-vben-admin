@@ -2,8 +2,8 @@ import type { Store } from '@vben-core/shared/store';
 
 import type { SrsRtcPlayer, SrsRtcPublisher, SrsRtcWhipWhep } from './sdk';
 import type {
-  OssrsApiOptions,
   OssrsCallbacks,
+  OssrsPlayerApiOptions,
   OssrsPlayerState,
 } from './types';
 
@@ -36,7 +36,7 @@ export class OssrsPlayerApi {
   private videoAbort: AbortController | null = null;
   private videoElement: HTMLVideoElement | null = null;
 
-  constructor(options: OssrsApiOptions = {}) {
+  constructor(options: OssrsPlayerApiOptions = {}) {
     const {
       onPlay,
       onPause,

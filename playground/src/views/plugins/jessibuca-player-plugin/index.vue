@@ -190,7 +190,7 @@ function resetUrl() {
   currentUrl.value = DEFAULT_URL;
   urlHistory.value = [];
   isCleared.value = false;
-  void api.clearView();
+  void api.destroy();
 }
 
 function handleToggle() {
@@ -377,6 +377,7 @@ onBeforeUnmount(() => {
         @resize="handleSizeResize"
       >
         <Player
+          v-if="currentUrl && !isCleared"
           :api="api"
           :url="currentUrl"
           :config="config"

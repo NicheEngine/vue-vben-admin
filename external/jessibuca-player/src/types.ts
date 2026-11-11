@@ -175,7 +175,7 @@ export interface JessibucaCallbacks {
   onTimeUpdate?: (currentTime: number) => void;
 }
 
-export interface JessibucaApiOptions
+export interface JessibucaPlayerApiOptions
   extends JessibucaCallbacks, Partial<JessibucaStoreState> {
   /** 初始地址（创建时生效一次，后续用 setUrl） */
   initialUrl?: string;

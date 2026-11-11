@@ -48,7 +48,7 @@ export interface OssrsCallbacks {
   onTrack?: (event: RTCTrackEvent) => void;
 }
 
-export interface OssrsApiOptions extends OssrsCallbacks {
+export interface OssrsPlayerApiOptions extends OssrsCallbacks {
   initialUrl?: string;
   initialProtocol?: 'rtc' | 'whep';
   initialState?: Partial<OssrsPlayerState>;

@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { Component } from 'vue';
 
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { Card } from 'antdv-next';
 
@@ -41,8 +41,33 @@ onMounted(() => {
   });
 });
 
+watch(
+  () => props.players,
+  (newPlayers, oldPlayers) => {
+    // 清理旧实例（旧 players 中不在新 players 里的）
+    const newSet = new Set(newPlayers);
+    (oldPlayers ?? []).forEach((p) => {
+      if (!newSet.has(p)) void p.onDestroy();
+    });
+    // 重置渲染状态，按新 players 长度重建
+    renderStates.value = newPlayers.map(() => false);
+    timers.forEach((t) => clearTimeout(t));
+    timers.length = 0;
+    const delays = [300, 1000, 1800];
+    newPlayers.forEach((_, i) => {
+      timers.push(
+        setTimeout(() => {
+          renderStates.value[i] = true;
+        }, delays[i] || 1800),
+      );
+    });
+  },
+  { deep: false },
+);
+
 onBeforeUnmount(() => {
   timers.forEach((t) => clearTimeout(t));
+  timers.length = 0;
   props.players.forEach((p) => {
     void p.onDestroy();
   });

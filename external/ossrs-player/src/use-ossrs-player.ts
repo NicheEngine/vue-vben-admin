@@ -1,6 +1,6 @@
 import type {
   ExtendedOssrsPlayerApi,
-  OssrsApiOptions,
+  OssrsPlayerApiOptions,
   OssrsPlayerInnerProps,
 } from './types';
 
@@ -11,7 +11,7 @@ import { useSelector } from '@vben-core/shared/store';
 import { OssrsPlayerApi } from './ossrs-player-api';
 import OssrsPlayer from './ossrs-player.vue';
 
-export function useOssrsPlayer(options: OssrsApiOptions = {}) {
+export function useOssrsPlayer(options: OssrsPlayerApiOptions = {}) {
   const api = new OssrsPlayerApi(options);
 
   const extendedApi = api as ExtendedOssrsPlayerApi;

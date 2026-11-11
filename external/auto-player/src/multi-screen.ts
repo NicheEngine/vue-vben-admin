@@ -4,6 +4,7 @@ import type {
   AutoPlayerType,
 } from './types';
 
+import { checkEngineReadySync } from './engine-ready';
 import { useAutoPlayer } from './use-auto-player';
 
 const SCALE_LABELS: Record<0 | 1 | 2, string> = {
@@ -17,11 +18,15 @@ export function createAutoMultiScreenPlayers(
   forceType?: AutoPlayerType,
   opts: Omit<AutoPlayerOptions, 'initialUrl' | 'scaleMode'> = {},
 ): AutoMultiScreenPlayer[] {
+  // forceType 不可用时回退自动选型，避免三屏全黑
+  const ready = checkEngineReadySync();
+  const safeType = forceType && ready[forceType] ? forceType : undefined;
+
   return ([0, 1, 2] as const).map((mode) => {
     const [Player, api] = useAutoPlayer({
       ...opts,
       initialUrl: url,
-      initialType: forceType, // 👈 强制指定当前引擎
+      initialType: safeType,
       scaleMode: mode,
       muted: true,
     });
@@ -31,7 +36,7 @@ export function createAutoMultiScreenPlayers(
         url,
         scaleMode: mode,
         api,
-        type: forceType, // 👈 传给 AutoPlayer 组件
+        type: safeType,
       },
       onDestroy: () => api.destroy(),
       label: SCALE_LABELS[mode],

@@ -1,5 +1,9 @@
 import type { Component, Ref } from 'vue';
 
+import type { EasyPlayerApiOptions } from '@vben/easy-player';
+import type { JessibucaPlayerApiOptions } from '@vben/jessibuca-player';
+import type { LivePlayerApiOptions } from '@vben/live-player';
+import type { OssrsPlayerApiOptions } from '@vben/ossrs-player';
 import type {
   IPlayerApi,
   IPlayerApiExt,
@@ -96,6 +100,16 @@ export interface AutoPlayerOptions {
   muted?: boolean;
   autoplay?: boolean;
   scaleMode?: 0 | 1 | 2;
+
+  // ===== 引擎专属透传（只影响对应引擎）=====
+  /** easy-player 透传参数（覆盖 auto-player 默认） */
+  easyOptions?: Partial<EasyPlayerApiOptions>;
+  /** jessibuca 透传参数（覆盖 auto-player 默认） */
+  jessibucaOptions?: Partial<JessibucaPlayerApiOptions>;
+  /** live-player 透传参数（覆盖 auto-player 默认） */
+  liveOptions?: Partial<LivePlayerApiOptions>;
+  /** ossrs-player 透传参数（覆盖 auto-player 默认） */
+  ossrsOptions?: Partial<OssrsPlayerApiOptions>;
 }
 
 export interface AutoMultiScreenPlayer {

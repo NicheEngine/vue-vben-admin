@@ -23,6 +23,8 @@ const elapsed = computed(() => {
   return `${hh}:${mm}:${ss}`;
 });
 
+const canStart = computed(() => props.canRecord && !props.isRecording);
+
 function stopTimer() {
   if (timer) {
     clearInterval(timer);
@@ -55,6 +57,7 @@ function toggle() {
   if (props.isRecording) {
     props.stopRecordAndSave();
   } else {
+    if (!canStart.value) return;
     props.startRecord(`jessibuca-${Date.now()}`, 'webm');
   }
 }
@@ -70,7 +73,7 @@ onBeforeUnmount(() => {
       <Button
         :type="isRecording ? 'primary' : 'default'"
         :danger="isRecording"
-        :disabled="!isRecording && canRecord === false"
+        :disabled="!isRecording && !canStart"
         @click="toggle"
       >
         {{ isRecording ? '停止并保存' : '开始录制' }}

@@ -103,17 +103,18 @@ async function createInstance() {
     emit('error', new Error('Jessibuca 库未加载'));
     return;
   }
-
+  const storeConfig = api.getResolvedConfig();
   // 核心修复：从 api store 里获取正确的配置（包含 external 传进来的 scaleMode）
   const currentScaleMode = api.store.state.config.scaleMode ?? 1;
 
   const config = {
+    ...storeConfig,
     container: containerRef.value,
-    isMute: true,
-    videoBuffer: 0.2,
-    decoder: '/jessibuca/decoder.js',
-    loadingText: '加载中...',
-    scaleMode: currentScaleMode, // 👈 必须传给底层初始化！
+    isMute: storeConfig.isMute ?? true,
+    videoBuffer: storeConfig.videoBuffer ?? 0.2,
+    decoder: storeConfig.decoder || '/jessibuca/decoder.js',
+    loadingText: storeConfig.loadingText || '加载中...',
+    scaleMode: currentScaleMode,
   };
 
   try {
@@ -121,7 +122,7 @@ async function createInstance() {
     api.bindInstance(instance);
     api.clearRebuildFlag();
 
-    // 🔥 初始化后，立即应用一次 scaleMode 并 resize
+    // 初始化后，立即应用一次 scaleMode 并 resize
     if (currentScaleMode !== undefined) {
       instance.setScaleMode(currentScaleMode);
       instance.resize();

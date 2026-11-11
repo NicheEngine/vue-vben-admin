@@ -191,7 +191,15 @@ export function createLiveAdapter(api: LivePlayerApi): IPlayerApiFull {
 
     startRecord: () => {
       const video = api.video;
-      if (!video) return;
+      if (!video) {
+        error.value = '播放器未就绪，无法录制';
+        return;
+      }
+      if (!isPlaying.value || video.paused) {
+        error.value = '请先播放视频后再开始录制';
+        return;
+      }
+      if (isRecording.value) return;
       const stream = (video as any).captureStream?.() as MediaStream;
       if (!stream) return;
       mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });

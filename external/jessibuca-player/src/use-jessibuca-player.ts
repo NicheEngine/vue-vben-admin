@@ -1,4 +1,4 @@
-import type { ExtendedJessibucaApi, JessibucaApiOptions } from './types';
+import type { ExtendedJessibucaApi, JessibucaPlayerApiOptions } from './types';
 
 import { useSelector } from '@vben-core/shared/store';
 
@@ -15,7 +15,7 @@ import JessibucaPlayer from './jessibuca-player.vue';
  * options 中的 url/config 仅作为初始值，后续请用 setUrl/setConfig 更新；
  * 推荐用 initialUrl/initialConfig 明确语义。
  */
-export function useJessibucaPlayer(options: JessibucaApiOptions = {}) {
+export function useJessibucaPlayer(options: JessibucaPlayerApiOptions = {}) {
   const api = new JessibucaPlayerApi(options);
 
   const extendedApi = api as unknown as ExtendedJessibucaApi;
