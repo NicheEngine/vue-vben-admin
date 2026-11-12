@@ -1,10 +1,11 @@
 <script lang="ts" setup>
-import type { Point } from '@vben/amap'; // 移除 OverlayRecord
+import type { Point } from '@vben/amap';
 
-import { computed, onBeforeUnmount, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
 import { Amap2d, useAmap2d } from '@vben/amap';
 import { Page } from '@vben/common-ui';
+import { usePreferences } from '@vben/preferences';
 
 import {
   Button,
@@ -24,6 +25,8 @@ import {
   AmapDistrict,
   AmapDraw,
   AmapFence,
+  AmapFloatingDock,
+  AmapFloatingDraw,
   AmapHeatmap,
   AmapLayer,
   AmapMeasure,
@@ -36,11 +39,48 @@ import {
 
 defineOptions({ name: 'Amap2dPluginExample' });
 
+// ================= 布局切换状态 =================
+const layoutMode = ref<'floating' | 'sidebar'>('sidebar');
+
+const dockItems = [
+  { key: 'search', icon: 'mdi:magnify', label: '搜索' },
+  { key: 'tool', icon: 'mdi:map-marker-radius', label: '地图工具' },
+  { key: 'draw', icon: 'mdi:draw', label: '绘制' },
+  { key: 'layer', icon: 'mdi:layers', label: '图层' },
+];
+
 const [, api, config] = useAmap2d({
   config: { center: [116.397, 39.892], zoom: 12 },
 });
 
 const isReady = computed(() => api.isReady.value);
+
+// ================= 全局主题联动逻辑 =================
+const { isDark } = usePreferences();
+
+// 监听系统主题，强制切换地图底图
+watch(
+  [isDark, isReady],
+  ([dark, ready]) => {
+    if (!ready) return; // 地图未就绪时不执行
+
+    try {
+      const map = api.getMapInstance();
+      if (!map) return;
+
+      // 1. 切换地图底图样式
+      map.setMapStyle(dark ? 'amap://styles/dark' : 'amap://styles/normal');
+
+      // 2. 如果切到暗黑，强制清空所有叠加层（防止卫星图等高优先级图层盖住暗黑底图）
+      if (dark) {
+        api.setLayers([]);
+      }
+    } catch (error) {
+      console.warn('地图主题切换失败', error);
+    }
+  },
+  { immediate: true },
+);
 
 // ================= 坐标渲染逻辑 =================
 const testCoord = reactive<{ lng: number; lat: number }>({
@@ -128,7 +168,7 @@ onBeforeUnmount(() => clearLocationMarker());
             <b>图层</b>：支持电子地图与卫星影像互斥切换，可叠加文字、路网、实时路况、主题切换。
           </p>
           <p>
-            <b>绘制</b>：支持点标记、圆、多边形、折线，绘制后自动进入编辑，可在列表中点击切换编辑并导出
+            <b>绘制</b>：支持点标记、圆、多边形、折线，绘制后自动进入编辑，可导出
             GeoJSON。
           </p>
           <p>
@@ -153,7 +193,6 @@ onBeforeUnmount(() => clearLocationMarker());
       </template>
 
       <div class="flex flex-col gap-4 py-1">
-        <!-- 第一行：坐标系基准与切换 -->
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex items-center gap-2">
             <span class="text-sm text-foreground/70">底图基准：</span>
@@ -176,7 +215,6 @@ onBeforeUnmount(() => clearLocationMarker());
 
         <div class="h-px w-full bg-border/50"></div>
 
-        <!-- 第二行：输入与渲染 -->
         <div class="flex flex-wrap items-center gap-3">
           <div class="flex items-center gap-2">
             <span class="text-sm text-foreground/70">测试坐标：</span>
@@ -210,12 +248,23 @@ onBeforeUnmount(() => clearLocationMarker());
       </div>
     </Card>
 
-    <!-- 核心布局：固定高度，左侧独立滚动 -->
+    <!-- 布局模式切换 -->
+    <div class="mb-4 flex items-center gap-3">
+      <span class="text-sm font-medium text-foreground/80">工具栏风格：</span>
+      <RadioGroup v-model:value="layoutMode" button-style="solid" size="small">
+        <RadioButton value="sidebar">侧边栏模式</RadioButton>
+        <RadioButton value="floating">悬浮极简模式</RadioButton>
+      </RadioGroup>
+    </div>
+
+    <!-- 核心布局 -->
     <div class="flex h-[800px] w-full items-stretch gap-4">
-      <!-- 左侧面板 -->
-      <div class="flex h-full w-[340px] shrink-0 flex-col overflow-hidden">
+      <!-- 模式 1：侧边栏 -->
+      <div
+        v-if="layoutMode === 'sidebar'"
+        class="flex h-full w-[340px] shrink-0 flex-col overflow-hidden"
+      >
         <div class="flex flex-1 flex-col gap-4 overflow-y-auto pb-2 pr-1">
-          <!-- 地点搜索 -->
           <Card title="地点搜索" size="small">
             <AmapSearch :api="api" :center="api.center.value" />
             <div
@@ -224,34 +273,30 @@ onBeforeUnmount(() => clearLocationMarker());
               <span class="shrink-0 text-xs leading-none text-foreground/60">快速跳转：</span>
               <div class="flex flex-wrap gap-2">
                 <Button size="small" @click="goCity([116.397, 39.892])">
-                  北京
-                </Button>
+北京
+</Button>
                 <Button size="small" @click="goCity([121.473, 31.23])">
-                  上海
-                </Button>
+上海
+</Button>
                 <Button size="small" @click="goCity([113.264, 23.129])">
-                  广州
-                </Button>
+广州
+</Button>
               </div>
             </div>
           </Card>
 
-          <!-- 地图工具 -->
           <Card title="地图工具" size="small">
             <AmapToolbar :api="api" @locate="handleLocate" />
           </Card>
 
-          <!-- 🔥 绘制与编辑工具（自带覆盖物列表） -->
           <Card title="绘制与编辑" size="small" class="relative">
             <AmapDraw :api="api" />
           </Card>
 
-          <!-- 图层控制 -->
           <Card title="图层控制" size="small">
             <AmapLayer :api="api" />
           </Card>
 
-          <!-- 高级交互 -->
           <Card title="高级交互" size="small">
             <div class="flex flex-wrap items-center gap-2">
               <AmapMeasure :api="api" />
@@ -259,7 +304,6 @@ onBeforeUnmount(() => clearLocationMarker());
             </div>
           </Card>
 
-          <!-- 数据可视化 -->
           <Card title="数据可视化" size="small">
             <div class="flex flex-wrap items-center gap-2">
               <AmapHeatmap :api="api" />
@@ -267,12 +311,10 @@ onBeforeUnmount(() => clearLocationMarker());
             </div>
           </Card>
 
-          <!-- 路线巡航 -->
           <Card title="路线巡航" size="small">
             <AmapPath :api="api" />
           </Card>
 
-          <!-- 服务查询 -->
           <Card title="服务查询" size="small">
             <div class="flex flex-col gap-4">
               <div>
@@ -286,7 +328,6 @@ onBeforeUnmount(() => clearLocationMarker());
             </div>
           </Card>
 
-          <!-- 实时状态 -->
           <Card title="实时状态" size="small">
             <AmapStatus :api="api" />
           </Card>
@@ -295,11 +336,43 @@ onBeforeUnmount(() => clearLocationMarker());
 
       <!-- 右侧地图区域 -->
       <Card
-        class="flex-1 overflow-hidden"
+        class="relative flex-1 overflow-hidden"
         :styles="{ body: { padding: 0, height: '100%' } }"
       >
         <AmapContainer class="h-full w-full" :api="api">
           <Amap2d class="h-full w-full" :api="api" :config="config" />
+
+          <!-- 模式 2：悬浮极简模式 -->
+          <AmapFloatingDock
+            v-if="layoutMode === 'floating'"
+            :items="dockItems"
+            :api="api"
+          >
+            <template #search>
+              <div class="text-sm">
+                <div class="mb-2 font-medium">搜索</div>
+                <AmapSearch :api="api" :center="api.center.value" />
+              </div>
+            </template>
+            <template #tool>
+              <div class="text-sm">
+                <div class="mb-2 font-medium">地图工具</div>
+                <AmapToolbar :api="api" @locate="handleLocate" />
+              </div>
+            </template>
+            <template #draw>
+              <div class="text-sm">
+                <div class="mb-2 font-medium">绘制</div>
+                <AmapFloatingDraw :api="api" />
+              </div>
+            </template>
+            <template #layer>
+              <div class="text-sm">
+                <div class="mb-2 font-medium">图层控制</div>
+                <AmapLayer :api="api" />
+              </div>
+            </template>
+          </AmapFloatingDock>
         </AmapContainer>
       </Card>
     </div>

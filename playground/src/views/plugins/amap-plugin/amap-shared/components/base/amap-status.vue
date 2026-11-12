@@ -3,7 +3,7 @@ import type { IAmap2dApi, IAmap3dApi } from '@vben/amap';
 
 import { computed } from 'vue';
 
-import { formatAddress, formatPoint } from '../utils';
+import { formatAddress, formatPoint } from '../../utils';
 
 const props = defineProps<{
   api: IAmap2dApi | IAmap3dApi;

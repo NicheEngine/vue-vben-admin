@@ -10,7 +10,7 @@ import { onBeforeUnmount, ref, watchEffect } from 'vue';
 
 import { Button, message, Tag } from 'antdv-next';
 
-import { convertOverlaysToGeoJSON, downloadJSON } from '../utils';
+import { convertOverlaysToGeoJSON, downloadJSON } from '../../utils';
 
 const props = defineProps<{ api: IAmap2dApi | IAmap3dApi }>();
 
