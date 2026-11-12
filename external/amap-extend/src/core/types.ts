@@ -3,6 +3,8 @@ import type { Ref } from 'vue';
 /** 坐标点 [经度, 纬度] */
 export type Point = [number, number];
 
+export type CoordinateSystem = 'GCJ02' | 'WGS84';
+
 /** 覆盖物类型 */
 export type OverlayType = 'circle' | 'marker' | 'polygon' | 'polyline';
 
@@ -42,6 +44,7 @@ export interface AmapBaseState {
   currentAddress: Readonly<Ref<null | string>>;
   overlays: Readonly<Ref<OverlayRecord[]>>;
   activeLayers: Readonly<Ref<string[]>>;
+  coordinateSystem: Readonly<Ref<CoordinateSystem>>;
 }
 
 /** 2D 状态：显式判别字段 `kind: '2d'` */
@@ -126,8 +129,11 @@ export interface IAmapCommonApi {
   /** 通用地图事件订阅，返回取消函数 */
   on(type: AmapEventType, handler: AmapEventHandler): () => void;
   off(type: AmapEventType, handler: AmapEventHandler): void;
-
+  setCoordinateSystem(sys: CoordinateSystem): void;
+  /** 将 WGS84 坐标转为 GCJ02 */
+  convertFromGPS(points: Point[]): Promise<Point[]>;
   getMapInstance(): any;
+  getAMap(): any;
 }
 
 export interface IAmap2dApi extends Amap2dState, IAmapCommonApi {

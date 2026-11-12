@@ -21,7 +21,7 @@ const emit = defineEmits<{
       v-if="api.isLoading.value"
       class="absolute inset-0 z-10 flex items-center justify-center bg-black/50"
     >
-      <Spin size="large" tip="加载地图中...">
+      <Spin size="large" description="加载地图中...">
         <div class="h-20 w-20"></div>
       </Spin>
     </div>

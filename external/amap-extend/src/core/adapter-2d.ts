@@ -13,16 +13,10 @@ export function createAmap2dAdapter(): IAmap2dApi {
         ...config,
       }),
     setupLayers: ({ AMap, map, layerCache }) => {
-      layerCache.base = new AMap.TileLayer();
       layerCache.satellite = new AMap.TileLayer.Satellite();
       layerCache.roadnet = new AMap.TileLayer.RoadNet();
       layerCache.traffic = new AMap.TileLayer.Traffic();
-      map.add([
-        layerCache.base,
-        layerCache.satellite,
-        layerCache.roadnet,
-        layerCache.traffic,
-      ]);
+      map.add([layerCache.satellite, layerCache.roadnet, layerCache.traffic]);
       layerCache.satellite.hide();
       layerCache.roadnet.hide();
       layerCache.traffic.hide();

@@ -2,6 +2,7 @@ import type {
   AmapBaseState,
   AmapEventHandler,
   AmapEventType,
+  CoordinateSystem,
   DrawOptions,
   IAmapCommonApi,
   OverlayRecord,
@@ -51,6 +52,11 @@ export function createAdapterCore<K extends '2d' | '3d'>(
 
   const pluginManager = new AmapPluginManager();
   const layerCache: Record<string, any> = {};
+  const coordinateSystem = ref<CoordinateSystem>('GCJ02');
+
+  const setCoordinateSystem = (sys: CoordinateSystem) => {
+    coordinateSystem.value = sys;
+  };
 
   /** 🔥 保存 AMap 引用，替代 window.AMap */
   let AMapRef: any = null;
@@ -60,6 +66,21 @@ export function createAdapterCore<K extends '2d' | '3d'>(
   const eventBus = new Map<AmapEventType, Set<AmapEventHandler>>();
   const emit = (type: AmapEventType, e: any) => {
     eventBus.get(type)?.forEach((fn) => fn(e));
+  };
+
+  const convertFromGPS = (points: Point[]): Promise<Point[]> => {
+    return new Promise((resolve, reject) => {
+      if (!AMapRef) return reject(new Error('地图未初始化'));
+
+      // 高德 convertFrom 单次最多支持 40 个点，这里处理单点即可
+      AMapRef.convertFrom(points, 'gps', (status: string, result: any) => {
+        if (status === 'complete' && result.locations) {
+          resolve(result.locations.map((l: any) => [l.lng, l.lat]));
+        } else {
+          reject(new Error('坐标转换失败'));
+        }
+      });
+    });
   };
 
   const on = (type: AmapEventType, handler: AmapEventHandler) => {
@@ -344,7 +365,11 @@ export function createAdapterCore<K extends '2d' | '3d'>(
     // events
     on,
     off,
+    coordinateSystem,
+    setCoordinateSystem,
+    convertFromGPS,
     // instance
-    getMapInstance: () => mapInstance.value,
+    getAMap: () => AMapRef, // 暴露全局 AMap 类
+    getMapInstance: () => mapInstance.value, // 暴露地图实例
   };
 }
